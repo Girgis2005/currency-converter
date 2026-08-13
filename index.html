@@ -2,253 +2,463 @@
 <html lang="ar" dir="rtl">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
-<title>محول العملات</title>
-
-<!-- Makes it behave like a standalone app when added to Home Screen (iOS/Android) -->
-<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>جسر · Gesr — مترجم فوري</title>
+<link rel="manifest" href="manifest.json" />
+<meta name="theme-color" content="#0D1F1E" />
 <meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-<meta name="apple-mobile-web-app-title" content="محول العملات" />
-<link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='22' fill='%232563eb'/%3E%3Ctext x='50' y='65' font-size='50' text-anchor='middle' fill='white' font-family='Arial'%3E%24%3C/text%3E%3C/svg%3E" />
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='22' fill='%232563eb'/%3E%3Ctext x='50' y='65' font-size='50' text-anchor='middle' fill='white' font-family='Arial'%3E%24%3C/text%3E%3C/svg%3E" />
-
+<meta name="apple-mobile-web-app-title" content="جسر" />
+<link rel="icon" href="icons/icon-192.png" />
+<link rel="apple-touch-icon" href="icons/icon-192.png" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;900&family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 <style>
-  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-  html, body {
-    margin: 0; padding: 0; height: 100%;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Tahoma, Arial, sans-serif;
-    background: linear-gradient(to bottom, #f8fafc, #eef2f7);
-    color: #1e293b;
-  }
+  * { box-sizing: border-box; }
   body {
+    margin: 0;
+    min-height: 100vh;
+    background: #0D1F1E;
+    color: #F2EDE4;
+    font-family: 'Space Grotesk', sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 24px 16px 40px;
+  }
+  textarea::placeholder { color: #6B8A87; }
+  textarea:focus, select:focus, button:focus-visible, input:focus-visible {
+    outline: 2px solid #E8A33D;
+    outline-offset: 2px;
+  }
+  .wrap { width: 100%; max-width: 480px; }
+  .header-row { display: flex; align-items: baseline; gap: 10px; }
+  h1 {
+    font-family: 'Tajawal', sans-serif;
+    font-weight: 900;
+    font-size: 30px;
+    margin: 0;
+    letter-spacing: -0.5px;
+  }
+  .eyebrow {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: #6B8A87;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+  .subtitle { margin: 4px 0 0; font-size: 13px; color: #8FADA9; }
+  .settings-btn {
+    margin-right: auto;
+    background: #163634;
+    border: 1px solid #2B5350;
+    border-radius: 999px;
+    width: 38px; height: 38px;
     display: flex; align-items: center; justify-content: center;
-    padding: 20px; min-height: 100vh;
-    padding-top: max(20px, env(safe-area-inset-top));
-    padding-bottom: max(20px, env(safe-area-inset-bottom));
+    color: #E8A33D; cursor: pointer;
   }
-  .card {
-    width: 100%; max-width: 380px;
-    background: #fff; border-radius: 20px;
-    box-shadow: 0 4px 24px rgba(0,0,0,0.08);
-    padding: 24px;
+  .banner {
+    background: #3A1F1C; border: 1px solid #FF6F59; color: #FFB8A8;
+    border-radius: 10px; padding: 10px 14px; font-size: 13px;
+    margin-bottom: 14px; display: flex; justify-content: space-between; align-items: center; gap: 10px;
   }
-  h1 { font-size: 20px; text-align: center; margin: 0 0 6px; }
-  .status {
-    display: flex; align-items: center; justify-content: center; gap: 8px;
-    font-size: 12px; color: #64748b; margin-bottom: 20px;
+  .banner.info { background: #17322F; border-color: #2B5350; color: #C8DEDA; }
+  .banner button { background: none; border: none; color: inherit; cursor: pointer; font-size: 16px; flex-shrink: 0; }
+  .lang-row { display: flex; align-items: center; gap: 8px; margin-bottom: 14px; }
+  select {
+    flex: 1; background: #12302E; border: 1px solid #204442; border-radius: 10px;
+    color: #F2EDE4; padding: 10px 8px; font-size: 14px; font-family: 'Space Grotesk', sans-serif;
   }
-  .dot { width: 8px; height: 8px; border-radius: 50%; background: #facc15; }
-  .dot.live { background: #22c55e; }
-  .dot.error { background: #f87171; }
-  .dot.loading { animation: pulse 1.2s infinite; }
-  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
-  .refresh-btn {
-    background: none; border: none; color: #3b82f6; text-decoration: underline;
-    font-size: 12px; cursor: pointer; padding: 0;
+  .swap-btn {
+    background: #163634; border: 1px solid #2B5350; border-radius: 999px;
+    width: 42px; height: 42px; display: flex; align-items: center; justify-content: center;
+    color: #E8A33D; cursor: pointer; flex-shrink: 0;
   }
-  .row {
-    display: flex; align-items: center; gap: 10px;
-    background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 14px;
-    padding: 12px 16px; margin-bottom: 12px;
-    transition: border-color .15s, box-shadow .15s;
+  .card { background: #12302E; border: 1px solid #204442; border-radius: 16px; padding: 14px; width: 100%; }
+  .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+  .card-label {
+    font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: 1px;
+    text-transform: uppercase; color: #8FADA9;
   }
-  .row:focus-within { border-color: #60a5fa; box-shadow: 0 0 0 3px rgba(96,165,250,0.15); }
-  .flag { font-size: 26px; }
-  .row .info { flex: 1; }
-  .label { font-size: 11px; color: #64748b; margin-bottom: 2px; }
-  input {
-    width: 100%; border: none; background: transparent; outline: none;
-    font-size: 18px; font-weight: 600; color: #1e293b;
+  .icon-btn {
+    border: none; border-radius: 999px; width: 36px; height: 36px;
+    display: flex; align-items: center; justify-content: center; cursor: pointer;
+    background: #1F4744; color: #E8A33D;
   }
-  .symbol { color: #94a3b8; font-weight: 500; font-size: 14px; }
-  .clear-btn {
-    width: 100%; background: none; border: none; color: #64748b;
-    font-size: 13px; padding: 10px 0; cursor: pointer;
+  .icon-btn:disabled { color: #3E5C59; cursor: default; }
+  textarea, .output {
+    width: 100%; min-height: 90px; background: transparent; border: none;
+    color: #F2EDE4; font-size: 17px; line-height: 1.5; resize: none; padding: 0;
+    font-family: inherit;
   }
-  .rates-toggle {
-    border-top: 1px solid #f1f5f9; margin-top: 8px; padding-top: 14px;
+  .output.placeholder { color: #4E706C; display: flex; align-items: center; }
+  .bridge { display: flex; gap: 5px; margin: 10px 0; height: 14px; align-items: center; }
+  .bridge-line { width: 28px; height: 1px; background: #2B5350; }
+  .dot { width: 5px; height: 5px; border-radius: 50%; background: #E8A33D; animation: crossflow 1.1s ease-in-out infinite; }
+  @keyframes crossflow { 0% { transform: translateX(-6px); opacity: .3; } 50% { transform: translateX(6px); opacity: 1; } 100% { transform: translateX(-6px); opacity: .3; } }
+  @keyframes pulse-ring { 0% { box-shadow: 0 0 0 0 rgba(255,111,89,.5);} 70% { box-shadow: 0 0 0 14px rgba(255,111,89,0);} 100% { box-shadow: 0 0 0 0 rgba(255,111,89,0);} }
+  .mic-active { animation: pulse-ring 1.4s infinite; background: #FF6F59 !important; color: #0D1F1E !important; }
+  .footnote { font-size: 11px; color: #4E706C; margin-top: 24px; font-family: 'JetBrains Mono', monospace; text-align: center; }
+  @media (prefers-reduced-motion: reduce) { .dot, .mic-active { animation: none; } }
+
+  .modal-backdrop {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.6); display: none;
+    align-items: center; justify-content: center; z-index: 50; padding: 20px;
   }
-  .rates-toggle > button {
-    background: none; border: none; color: #3b82f6; font-size: 12px; cursor: pointer; padding: 0;
+  .modal-backdrop.open { display: flex; }
+  .modal {
+    background: #12302E; border: 1px solid #2B5350; border-radius: 16px;
+    padding: 20px; width: 100%; max-width: 420px;
   }
-  .rates-panel {
-    margin-top: 12px; background: #f8fafc; border-radius: 14px; padding: 12px;
-    display: none;
+  .modal h2 { font-family: 'Tajawal', sans-serif; font-size: 18px; margin: 0 0 8px; }
+  .modal p { font-size: 13px; color: #8FADA9; line-height: 1.6; margin: 0 0 14px; }
+  .modal input {
+    width: 100%; background: #0D1F1E; border: 1px solid #204442; border-radius: 10px;
+    color: #F2EDE4; padding: 10px 12px; font-size: 14px; font-family: 'JetBrains Mono', monospace;
+    margin-bottom: 14px;
   }
-  .rates-panel.open { display: block; }
-  .rates-panel label { font-size: 11px; color: #64748b; display: block; margin-bottom: 4px; }
-  .rates-panel input[type=number] {
-    width: 100%; background: #fff; border: 1px solid #e2e8f0; border-radius: 10px;
-    padding: 8px 10px; font-size: 14px; font-weight: 400; margin-bottom: 10px;
+  .modal-actions { display: flex; gap: 8px; justify-content: flex-end; }
+  .btn { border: none; border-radius: 10px; padding: 10px 16px; font-size: 14px; cursor: pointer; font-family: 'Space Grotesk', sans-serif; }
+  .btn-primary { background: #E8A33D; color: #0D1F1E; font-weight: 600; }
+  .btn-ghost { background: transparent; color: #8FADA9; }
+  a.modal-link { color: #E8A33D; }
+  .list-item {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 12px 4px; border-bottom: 1px solid #204442; cursor: pointer;
   }
-  .note { font-size: 11px; color: #94a3b8; line-height: 1.5; margin: 0; }
+  .list-item:last-child { border-bottom: none; }
+  .list-item:active { background: #0D1F1E; }
+  .list-item-text { font-size: 14px; }
+  .list-item-sub { font-size: 12px; color: #6B8A87; margin-top: 2px; }
+  .list-empty { font-size: 13px; color: #6B8A87; text-align: center; padding: 20px 0; }
+  .modal-scroll { max-height: 340px; overflow-y: auto; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .spinner {
+    width: 16px; height: 16px; border: 2px solid #2B5350; border-top-color: #E8A33D;
+    border-radius: 50%; animation: spin 0.7s linear infinite; display: inline-block;
+  }
 </style>
 </head>
 <body>
 
-<div class="card">
-  <h1>محول العملات</h1>
-  <div class="status">
-    <span id="dot" class="dot loading"></span>
-    <span id="statusText">جاري تحميل الأسعار…</span>
-    <button class="refresh-btn" onclick="fetchLiveRates()">تحديث</button>
+<div class="wrap">
+  <div class="header-row">
+    <h1>جسر</h1>
+    <span class="eyebrow">Gesr · Cairo ↔ São Paulo</span>
+    <button class="settings-btn" id="settingsBtn" aria-label="الإعدادات">⚙</button>
   </div>
+  <p class="subtitle">ترجمة فورية — كتابة وصوت</p>
+</div>
 
-  <div class="row">
-    <span class="flag">🇧🇷</span>
-    <div class="info">
-      <div class="label">Real برازيلي</div>
-      <input id="brl" inputmode="decimal" placeholder="0" oninput="updateFrom('brl', this.value)" />
+<div id="bannerHost" class="wrap"></div>
+
+<div class="wrap lang-row">
+  <select id="fromLang"></select>
+  <button class="swap-btn" id="swapBtn" aria-label="بدّل اللغات">⇄</button>
+  <select id="toLang"></select>
+</div>
+
+<div class="wrap" style="margin-bottom:14px;">
+  <button id="continuousBtn" style="width:100%; background:#12302E; border:1px solid #204442; color:#8FADA9; border-radius:10px; padding:10px; font-size:13px; font-family:'Space Grotesk',sans-serif; display:flex; align-items:center; justify-content:center; gap:8px; cursor:pointer;">
+    <span id="continuousDot" style="width:8px; height:8px; border-radius:50%; background:#4E706C;"></span>
+    محادثة مستمرة: متوقفة
+  </button>
+</div>
+
+<div class="wrap card">
+  <div class="card-header">
+    <span class="card-label" id="fromLabel"></span>
+    <div style="display:flex; gap:8px;">
+      <button class="icon-btn" id="copyFromBtn" aria-label="انسخ النص">📋</button>
+      <button class="icon-btn" id="speakFromBtn" disabled aria-label="اسمع النص">🔊</button>
+      <button class="icon-btn" id="micFromBtn" aria-label="سجل صوت">🎙</button>
     </div>
-    <span class="symbol">R$</span>
   </div>
+  <textarea id="sourceText" placeholder="اكتب أو دوس المايك واتكلم..."></textarea>
+</div>
 
-  <div class="row">
-    <span class="flag">🇪🇬</span>
-    <div class="info">
-      <div class="label">جنيه مصري</div>
-      <input id="egp" inputmode="decimal" placeholder="0" oninput="updateFrom('egp', this.value)" />
+<div class="wrap bridge" id="bridge">
+  <div class="bridge-line"></div>
+</div>
+
+<div class="wrap card">
+  <div class="card-header">
+    <span class="card-label" id="toLabel"></span>
+    <div style="display:flex; gap:8px;">
+      <button class="icon-btn" id="micToBtn" aria-label="سجل صوت">🎙</button>
+      <button class="icon-btn" id="speakToBtn" disabled aria-label="اسمع الترجمة">🔊</button>
+      <button class="icon-btn" id="copyToBtn" aria-label="انسخ الترجمة">📋</button>
     </div>
-    <span class="symbol">ج.م</span>
   </div>
+  <div class="output placeholder" id="outputText">هتظهر الترجمة هنا</div>
+</div>
 
-  <div class="row">
-    <span class="flag">🇺🇸</span>
-    <div class="info">
-      <div class="label">دولار أمريكي</div>
-      <input id="usd" inputmode="decimal" placeholder="0" oninput="updateFrom('usd', this.value)" />
+<div class="wrap" style="display:flex; gap:8px; margin-top:14px;">
+  <button class="btn btn-ghost" id="imageBtn" style="flex:1; background:#12302E; border:1px solid #204442; display:flex; align-items:center; justify-content:center; gap:6px;">📷 ترجمة صورة (مجاني)</button>
+  <button class="btn btn-ghost" id="phrasesBtn" style="flex:1; background:#12302E; border:1px solid #204442; display:flex; align-items:center; justify-content:center; gap:6px;">💬 عبارات جاهزة</button>
+  <button class="btn btn-ghost" id="historyBtn" style="flex:1; background:#12302E; border:1px solid #204442; display:flex; align-items:center; justify-content:center; gap:6px;">🕘 السجل</button>
+</div>
+<input type="file" id="imageInput" accept="image/*" style="display:none;" />
+
+<p class="footnote">وضع محادثة: كل واحد يدوس المايك اللي جنبه ويتكلم بلغته — التسجيل الصوتي وقراءة النص شغالين أحسن على Chrome</p>
+
+<div class="modal-backdrop" id="modalBackdrop">
+  <div class="modal">
+    <h2>مفتاح Anthropic API</h2>
+    <p>
+      لو سبتها فاضية، الترجمة هتشتغل بخدمة مجانية أضعف (مش لهجة مصرية دقيقة). حط مفتاحك عشان تاخد جودة Claude ولهجة مصرية طبيعية.
+      هيتخزن على متصفحك بس (localStorage)، مش بيتبعت لحد تاني غير Anthropic مباشرة.
+      تقدر تجيب مفتاح من
+      <a class="modal-link" href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">console.anthropic.com</a>
+      (لازم تشحن رصيد من Billing حتى لو بسيط عشان يشتغل).
+    </p>
+    <input type="password" id="apiKeyInput" placeholder="sk-ant-..." />
+    <div class="modal-actions">
+      <button class="btn btn-ghost" id="modalCancel">إلغاء</button>
+      <button class="btn btn-primary" id="modalSave">حفظ</button>
     </div>
-    <span class="symbol">$</span>
+    <div style="margin-top:16px; border-top:1px solid #204442; padding-top:14px;">
+      <button class="btn btn-ghost" id="installBtn" style="padding:8px 0; display:none;">⬇ ثبّت التطبيق على الشاشة الرئيسية</button>
+      <button class="btn btn-ghost" id="diagBtn" style="padding:8px 0;">🔍 شوف الأصوات المتاحة على الجهاز</button>
+      <pre id="diagOutput" style="white-space:pre-wrap; font-size:11px; font-family:'JetBrains Mono',monospace; color:#8FADA9; margin-top:8px; max-height:200px; overflow-y:auto;"></pre>
+    </div>
   </div>
+</div>
 
-  <button class="clear-btn" onclick="clearAll()">مسح الكل</button>
+<div class="modal-backdrop" id="phrasesBackdrop">
+  <div class="modal">
+    <h2>عبارات جاهزة</h2>
+    <p>دوس على أي عبارة عشان تتحط في الكارت الأول وتتترجم تلقائي.</p>
+    <div class="modal-scroll" id="phrasesList"></div>
+    <div class="modal-actions" style="margin-top:14px;">
+      <button class="btn btn-ghost" id="phrasesClose">قفل</button>
+    </div>
+  </div>
+</div>
 
-  <div class="rates-toggle">
-    <button id="toggleBtn" onclick="toggleRates()">الأسعار الحالية / تعديل يدوي ▼</button>
-    <div id="ratesPanel" class="rates-panel">
-      <label>1 دولار = كام جنيه مصري</label>
-      <input type="number" id="rateEgp" step="0.01" oninput="onManualRate()" />
-      <label>1 دولار = كام ريال برازيلي</label>
-      <input type="number" id="rateBrl" step="0.01" oninput="onManualRate()" />
-      <p class="note">
-        الأسعار دي سعر السوق العالمي الرسمي (mid-market)، مش بالضرورة سعر السوق السوداء في مصر. لو عايز تظبطها بسعر معين، عدّل الأرقام هنا يدوي.
-      </p>
+<div class="modal-backdrop" id="historyBackdrop">
+  <div class="modal">
+    <h2>سجل الترجمات</h2>
+    <div class="modal-scroll" id="historyList"></div>
+    <div class="modal-actions" style="margin-top:14px;">
+      <button class="btn btn-ghost" id="historyClear">امسح السجل</button>
+      <button class="btn btn-primary" id="historyClose">قفل</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="imageBackdrop">
+  <div class="modal">
+    <h2>ترجمة صورة</h2>
+    <div style="text-align:center; margin-bottom:12px;">
+      <img id="imagePreview" style="max-width:100%; max-height:220px; border-radius:10px; display:none;" />
+    </div>
+    <p id="imageModalText">بيقرا النص من الصورة ويترجمه...</p>
+    <div style="display:flex; align-items:center; justify-content:center; padding:10px 0;">
+      <span class="spinner" id="imageSpinner"></span>
+    </div>
+    <div class="modal-actions" id="imageDownloadRow" style="display:none; flex-wrap:wrap;">
+      <button class="btn btn-ghost" id="downloadTextBtn">⬇ نص .txt</button>
+      <button class="btn btn-primary" id="downloadImageBtn">⬇ صورة مترجمة</button>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" id="imageModalClose">قفل</button>
     </div>
   </div>
 </div>
 
 <script>
-  let usdToEgp = 49.2;
-  let usdToBrl = 5.15;
-  const REFRESH_MS = 5 * 60 * 1000;
+const LANGS = {
+  "ar-EG": { label: "مصري", labelEn: "Egyptian Arabic", speech: "ar-EG", dir: "rtl", font: "'Tajawal', sans-serif" },
+  "en-US": { label: "English", labelEn: "English", speech: "en-US", dir: "ltr", font: "'Space Grotesk', sans-serif" },
+  "pt-BR": { label: "Português", labelEn: "Portuguese (Brazil)", speech: "pt-BR", dir: "ltr", font: "'Space Grotesk', sans-serif" },
+};
+const LANG_ORDER = ["ar-EG", "en-US", "pt-BR"];
+const STORAGE_KEY = "gesr_anthropic_key";
 
-  function loadCache() {
-    try {
-      const cached = JSON.parse(localStorage.getItem('rates-cache'));
-      if (cached && cached.usdToEgp && cached.usdToBrl) {
-        usdToEgp = cached.usdToEgp;
-        usdToBrl = cached.usdToBrl;
-        document.getElementById('rateEgp').value = usdToEgp;
-        document.getElementById('rateBrl').value = usdToBrl;
-        setStatus('cached', 'بيانات محفوظة، جاري التحديث…');
-        return true;
-      }
-    } catch (e) {}
-    return false;
+let fromLang = "ar-EG";
+let toLang = "en-US";
+let isListening = false;
+let isTranslating = false;
+let continuousMode = false;
+let debounceTimer = null;
+let recognition = null;
+
+const $ = (id) => document.getElementById(id);
+const fromSelect = $("fromLang");
+const toSelect = $("toLang");
+const sourceText = $("sourceText");
+const outputText = $("outputText");
+const micFromBtn = $("micFromBtn");
+const micToBtn = $("micToBtn");
+const speakFromBtn = $("speakFromBtn");
+const speakToBtn = $("speakToBtn");
+const copyFromBtn = $("copyFromBtn");
+const copyToBtn = $("copyToBtn");
+const swapBtn = $("swapBtn");
+const bridge = $("bridge");
+const bannerHost = $("bannerHost");
+const fromLabel = $("fromLabel");
+const toLabel = $("toLabel");
+const imageBtn = $("imageBtn");
+const imageInput = $("imageInput");
+const phrasesBtn = $("phrasesBtn");
+const historyBtn = $("historyBtn");
+
+const PHRASEBOOK = {
+  "ar-EG": [
+    { cat: "تحية", text: "إزيك عامل إيه" },
+    { cat: "تحية", text: "صباح الخير" },
+    { cat: "تحية", text: "شكرًا جدًا" },
+    { cat: "تحية", text: "من فضلك" },
+    { cat: "تحية", text: "آسف" },
+    { cat: "أرقام", text: "بكام ده" },
+    { cat: "أرقام", text: "واحد اتنين تلاتة" },
+    { cat: "اتجاهات", text: "فين الحمام" },
+    { cat: "اتجاهات", text: "يمين ولا شمال" },
+    { cat: "اتجاهات", text: "قريب من هنا" },
+    { cat: "طوارئ", text: "محتاج مساعدة" },
+    { cat: "طوارئ", text: "اتصل بالإسعاف" },
+  ],
+  "en-US": [
+    { cat: "Greeting", text: "How are you doing" },
+    { cat: "Greeting", text: "Good morning" },
+    { cat: "Greeting", text: "Thank you very much" },
+    { cat: "Greeting", text: "Please" },
+    { cat: "Greeting", text: "Sorry" },
+    { cat: "Numbers", text: "How much is this" },
+    { cat: "Numbers", text: "One two three" },
+    { cat: "Directions", text: "Where is the bathroom" },
+    { cat: "Directions", text: "Left or right" },
+    { cat: "Directions", text: "Is it close by" },
+    { cat: "Emergency", text: "I need help" },
+    { cat: "Emergency", text: "Call an ambulance" },
+  ],
+  "pt-BR": [
+    { cat: "Saudação", text: "Como você está" },
+    { cat: "Saudação", text: "Bom dia" },
+    { cat: "Saudação", text: "Muito obrigado" },
+    { cat: "Saudação", text: "Por favor" },
+    { cat: "Saudação", text: "Desculpa" },
+    { cat: "Números", text: "Quanto custa isso" },
+    { cat: "Números", text: "Um dois três" },
+    { cat: "Direções", text: "Onde fica o banheiro" },
+    { cat: "Direções", text: "Esquerda ou direita" },
+    { cat: "Direções", text: "É perto daqui" },
+    { cat: "Emergência", text: "Preciso de ajuda" },
+    { cat: "Emergência", text: "Chame uma ambulância" },
+  ],
+};
+
+const HISTORY_KEY = "gesr_history";
+const HISTORY_MAX = 20;
+
+function populateSelects() {
+  [fromSelect, toSelect].forEach((sel) => {
+    sel.innerHTML = LANG_ORDER.map((code) => `<option value="${code}">${LANGS[code].label}</option>`).join("");
+  });
+  fromSelect.value = fromLang;
+  toSelect.value = toLang;
+}
+
+function refreshLabels() {
+  fromLabel.textContent = LANGS[fromLang].label;
+  toLabel.textContent = LANGS[toLang].label;
+  sourceText.dir = LANGS[fromLang].dir;
+  sourceText.style.fontFamily = LANGS[fromLang].font;
+  outputText.dir = LANGS[toLang].dir;
+  outputText.style.fontFamily = LANGS[toLang].font;
+}
+
+function showBanner(message, type = "error") {
+  bannerHost.innerHTML = `
+    <div class="banner ${type === "info" ? "info" : ""}">
+      <span>${message}</span>
+      <button aria-label="إغلاق">✕</button>
+    </div>`;
+  bannerHost.querySelector("button").onclick = () => (bannerHost.innerHTML = "");
+}
+
+function getApiKey() {
+  return localStorage.getItem(STORAGE_KEY) || "";
+}
+
+const ISO_CODE = { "ar-EG": "ar", "en-US": "en", "pt-BR": "pt" };
+
+async function translateWithMyMemory(text, from, to) {
+  const langpair = `${ISO_CODE[from]}|${ISO_CODE[to]}`;
+  const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=${langpair}`;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error("MyMemory request failed");
+  const data = await res.json();
+  const result = data?.responseData?.translatedText;
+  if (!result) throw new Error("MyMemory returned nothing");
+  return result;
+}
+
+async function translateText(text, from, to) {
+  const apiKey = getApiKey();
+
+  if (!apiKey) {
+    // Free fallback so the app works before billing is set up.
+    // Quality is lower (standard Arabic, not Egyptian dialect).
+    return await translateWithMyMemory(text, from, to);
   }
 
-  function setStatus(kind, text) {
-    const dot = document.getElementById('dot');
-    dot.className = 'dot ' + kind;
-    document.getElementById('statusText').textContent = text;
+  const fromLabelEn = LANGS[from].labelEn;
+  const toLabelEn = LANGS[to].labelEn;
+  const system = to === "ar-EG"
+    ? `You are a professional translator. Translate the user's text from ${fromLabelEn} into natural, everyday spoken Egyptian Arabic (Masri), the way people actually talk in Cairo — not Modern Standard Arabic. Reply with ONLY the translation, no notes, no quotes, no explanation.`
+    : `You are a professional translator. Translate the user's text from ${fromLabelEn} into natural, fluent ${toLabelEn}. Reply with ONLY the translation, no notes, no quotes, no explanation.`;
+
+  const res = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-api-key": apiKey,
+      "anthropic-version": "2023-06-01",
+      "anthropic-dangerous-direct-browser-access": "true",
+    },
+    body: JSON.stringify({
+      model: "claude-sonnet-4-6",
+      max_tokens: 1000,
+      system,
+      messages: [{ role: "user", content: text }],
+    }),
+  });
+  if (!res.ok) {
+    const body = await res.text();
+    if (res.status === 401) showBanner("المفتاح غلط أو منتهي — عدّله من الإعدادات ⚙");
+    else showBanner("الترجمة فشلت، حاول تاني");
+    throw new Error(body);
   }
+  const data = await res.json();
+  const block = data.content.find((b) => b.type === "text");
+  return block ? block.text.trim() : "";
+}
 
-  async function fetchLiveRates() {
-    setStatus('loading', 'جاري التحديث…');
-    try {
-      const res = await fetch('https://api.frankfurter.app/latest?from=USD&to=EGP,BRL');
-      if (!res.ok) throw new Error('bad response');
-      const data = await res.json();
-      const egp = data.rates && data.rates.EGP;
-      const brl = data.rates && data.rates.BRL;
-      if (!egp || !brl) throw new Error('missing rates');
-
-      usdToEgp = egp;
-      usdToBrl = brl;
-      document.getElementById('rateEgp').value = egp.toFixed(2);
-      document.getElementById('rateBrl').value = brl.toFixed(2);
-
-      const now = new Date();
-      localStorage.setItem('rates-cache', JSON.stringify({ usdToEgp: egp, usdToBrl: brl, ts: now.toISOString() }));
-      const timeStr = now.toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' });
-      setStatus('live', 'آخر تحديث ' + timeStr);
-      recalcFromLastEdited();
-    } catch (e) {
-      setStatus('error', 'تعذر التحديث، تأكد من الاتصال بالنت');
-    }
+function setTranslating(state) {
+  isTranslating = state;
+  if (state) {
+    bridge.innerHTML = `<span class="dot" style="animation-delay:0s"></span><span class="dot" style="animation-delay:.15s"></span><span class="dot" style="animation-delay:.3s"></span>`;
+  } else {
+    bridge.innerHTML = `<div class="bridge-line"></div>`;
   }
+}
 
-  function onManualRate() {
-    usdToEgp = parseFloat(document.getElementById('rateEgp').value) || usdToEgp;
-    usdToBrl = parseFloat(document.getElementById('rateBrl').value) || usdToBrl;
-    recalcFromLastEdited();
+function getBoxText(side) {
+  if (side === "from") return sourceText.value;
+  return outputText.classList.contains("placeholder") ? "" : outputText.textContent;
+}
+function setBoxText(side, text, isPlaceholder) {
+  if (side === "from") {
+    sourceText.value = text;
+  } else {
+    outputText.textContent = text;
+    outputText.classList.toggle("placeholder", !!isPlaceholder);
   }
-
-  let lastEdited = null;
-
-  function formatNum(n) {
-    if (!isFinite(n)) return '';
-    return (Math.round(n * 100) / 100).toString();
-  }
-
-  function updateFrom(source, rawValue) {
-    lastEdited = source;
-    if (rawValue === '') { clearAll(); return; }
-    const num = parseFloat(rawValue);
-    if (isNaN(num)) return;
-
-    let usd, brl, egp;
-    if (source === 'brl') {
-      brl = num; usd = brl / usdToBrl; egp = usd * usdToEgp;
-    } else if (source === 'usd') {
-      usd = num; brl = usd * usdToBrl; egp = usd * usdToEgp;
-    } else if (source === 'egp') {
-      egp = num; usd = egp / usdToEgp; brl = usd * usdToBrl;
-    }
-
-    if (source !== 'brl') document.getElementById('brl').value = formatNum(brl);
-    if (source !== 'usd') document.getElementById('usd').value = formatNum(usd);
-    if (source !== 'egp') document.getElementById('egp').value = formatNum(egp);
-  }
-
-  function recalcFromLastEdited() {
-    if (!lastEdited) return;
-    const el = document.getElementById(lastEdited);
-    if (el && el.value !== '') updateFrom(lastEdited, el.value);
-  }
-
-  function clearAll() {
-    document.getElementById('brl').value = '';
-    document.getElementById('egp').value = '';
-    document.getElementById('usd').value = '';
-    lastEdited = null;
-  }
-
-  function toggleRates() {
-    const panel = document.getElementById('ratesPanel');
-    const btn = document.getElementById('toggleBtn');
-    const open = panel.classList.toggle('open');
-    btn.textContent = open ? 'إخفاء الأسعار ▲' : 'الأسعار الحالية / تعديل يدوي ▼';
-  }
-
-  // init
-  loadCache();
-  document.getElementById('rateEgp').value = usdToEgp;
-  document.getElementById('rateBrl').value = usdToBrl;
-  fetchLiveRates();
-  setInterval(fetchLiveRates, REFRESH_MS);
-</script>
-
-</body>
-</html>
+}
+function otherSide(side) {
+  return side === "fr
