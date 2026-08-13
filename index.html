@@ -651,21 +651,27 @@ micToBtn.addEventListener("click", () => {
   isListening && activeSide === "to" ? stopListening() : startListening("to");
 });
 
-function detectLang(text) {
+function detectLang(text, currentLang) {
   const trimmed = text.trim();
   if (trimmed.length < 2) return null;
   if (/[\u0600-\u06FF]/.test(trimmed)) return "ar-EG";
-  // Portuguese-specific accented characters / common words not typical in English
-  if (/[ãõçáéíóúàâêô]|\bnão\b|\bvocê\b|\bobrigad[oa]\b/i.test(trimmed)) return "pt-BR";
-  if (/^[a-zA-Z0-9\s.,!?'"-]+$/.test(trimmed)) return "en-US";
+  const looksPortuguese = /[ãõçáéíóúàâêô]|\bnão\b|\bvocê\b|\bobrigad[oa]\b/i.test(trimmed);
+  if (looksPortuguese) return "pt-BR";
+  // Plain Latin text with no accents: only treat as a language switch when
+  // coming FROM Arabic (unambiguous script change). Never use it to flip
+  // between English and Portuguese — that pair is ambiguous without accents,
+  // and guessing "English" here misfires constantly while someone is still
+  // mid-word typing/correcting Portuguese.
+  if (currentLang === "ar-EG" && /^[a-zA-Z0-9\s.,!?'"-]+$/.test(trimmed) && trimmed.length >= 3) {
+    return "en-US";
+  }
   return null;
 }
 
 function autoSwitchLangForSide(side, text) {
-  const detected = detectLang(text);
-  if (!detected) return false;
   const current = langForSide(side);
-  if (detected === current) return false;
+  const detected = detectLang(text, current);
+  if (!detected || detected === current) return false;
   if (side === "from") {
     fromLang = detected;
     if (toLang === fromLang) toLang = LANG_ORDER.find((l) => l !== fromLang);
