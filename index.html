@@ -461,4 +461,590 @@ function setBoxText(side, text, isPlaceholder) {
   }
 }
 function otherSide(side) {
-  return side === "fr
+  return side === "from" ? "to" : "from";
+}
+function langForSide(side) {
+  return side === "from" ? fromLang : toLang;
+}
+
+async function runTranslate(side, autoSpeak) {
+  const from = side;
+  const to = otherSide(side);
+  const text = getBoxText(from);
+  if (!text.trim()) {
+    setBoxText(to, to === "to" ? "هتظهر الترجمة هنا" : "", true);
+    if (to === "to") speakToBtn.disabled = true; else speakFromBtn.disabled = true;
+    return;
+  }
+  setTranslating(true);
+  try {
+    const result = await translateText(text, langForSide(from), langForSide(to));
+    setBoxText(to, result, !result);
+    if (to === "to") speakToBtn.disabled = !result; else speakFromBtn.disabled = !result;
+    if (result && autoSpeak) {
+      await speak(to);
+      if (continuousMode && !isListening) {
+        setTimeout(() => startListening(to), 400);
+      }
+    }
+    if (result) saveHistory(langForSide(from), langForSide(to), text, result);
+  } catch (e) {
+    // banner already shown
+  } finally {
+    setTranslating(false);
+  }
+}
+
+fromSelect.addEventListener("change", () => {
+  if (fromSelect.value === toLang) toSelect.value = fromLang;
+  fromLang = fromSelect.value;
+  toLang = toSelect.value;
+  refreshLabels();
+  runTranslate("from");
+});
+toSelect.addEventListener("change", () => {
+  if (toSelect.value === fromLang) fromSelect.value = toLang;
+  toLang = toSelect.value;
+  fromLang = fromSelect.value;
+  refreshLabels();
+  runTranslate("from");
+});
+
+swapBtn.addEventListener("click", () => {
+  const oldFrom = fromLang, oldTo = toLang;
+  fromLang = oldTo; toLang = oldFrom;
+  fromSelect.value = fromLang; toSelect.value = toLang;
+  const srcVal = sourceText.value;
+  const outVal = outputText.classList.contains("placeholder") ? "" : outputText.textContent;
+  sourceText.value = outVal;
+  outputText.textContent = srcVal || "هتظهر الترجمة هنا";
+  outputText.classList.toggle("placeholder", !srcVal);
+  speakToBtn.disabled = !srcVal;
+  speakFromBtn.disabled = !outVal;
+  refreshLabels();
+});
+
+// --- Mic input (works for either side: "from" or "to") ---
+function showMicPermissionHelp() {
+  bannerHost.innerHTML = `
+    <div class="banner">
+      <span>
+        المايك متقفل للموقع ده. في Chrome: دوس على أيقونة القفل 🔒 أو ⓘ يسار شريط العنوان فوق ← Permissions ← Microphone ← Allow، وبعدين اعمل Reload للصفحة.
+      </span>
+      <button aria-label="إغلاق">✕</button>
+    </div>`;
+  bannerHost.querySelector("button").onclick = () => (bannerHost.innerHTML = "");
+}
+
+async function requestMicAccess() {
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    showBanner("المتصفح ده مش بيدعم المايك، جرب Chrome");
+    return false;
+  }
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    stream.getTracks().forEach((t) => t.stop()); // we only needed the permission prompt
+    return true;
+  } catch (err) {
+    if (err.name === "NotAllowedError" || err.name === "SecurityError") {
+      showMicPermissionHelp();
+    } else if (err.name === "NotFoundError") {
+      showBanner("مفيش مايك متاح على الجهاز ده");
+    } else {
+      showBanner("مقدرتش أوصل للمايك، جرب تاني");
+    }
+    return false;
+  }
+}
+
+const RECOGNITION_LANG = { "ar-EG": "ar-SA", "en-US": "en-US", "pt-BR": "pt-BR" };
+
+let audioUnlocked = false;
+const SILENT_WAV = "data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=";
+function unlockAudio() {
+  if (audioUnlocked) return;
+  const a = new Audio(SILENT_WAV);
+  a.play().then(() => { audioUnlocked = true; }).catch(() => {});
+}
+
+function micBtnFor(side) {
+  return side === "from" ? micFromBtn : micToBtn;
+}
+
+let activeSide = null;
+
+async function startListening(side) {
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) {
+    showBanner("المتصفح ده مش بيدعم التسجيل الصوتي، جرب Chrome");
+    return;
+  }
+  if (isListening) return; // one mic at a time
+
+  unlockAudio(); // must happen synchronously-ish within the click handler chain
+
+  const granted = await requestMicAccess();
+  if (!granted) return;
+  bannerHost.innerHTML = "";
+
+  activeSide = side;
+  recognition = new SR();
+  recognition.lang = RECOGNITION_LANG[langForSide(side)];
+  recognition.interimResults = true;
+  recognition.continuous = false;
+
+  recognition.onstart = () => {
+    isListening = true;
+    micBtnFor(side).classList.add("mic-active");
+  };
+  recognition.onerror = (event) => {
+    isListening = false;
+    micBtnFor(side).classList.remove("mic-active");
+    if (event.error === "not-allowed" || event.error === "service-not-allowed") {
+      showMicPermissionHelp();
+    } else if (event.error === "no-speech") {
+      showBanner("مسمعتش صوت، جرب تاني", "info");
+    } else {
+      showBanner("مقدرتش أسمعك، جرب تاني");
+    }
+  };
+  recognition.onend = () => {
+    isListening = false;
+    micBtnFor(side).classList.remove("mic-active");
+  };
+  recognition.onresult = (event) => {
+    let finalTranscript = "";
+    for (let i = 0; i < event.results.length; i++) finalTranscript += event.results[i][0].transcript;
+    setBoxText(side, finalTranscript, false);
+    clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(() => {
+      autoSwitchLangForSide(side, finalTranscript);
+      runTranslate(side, true);
+    }, 600);
+  };
+  recognition.start();
+}
+
+function stopListening() {
+  recognition && recognition.stop();
+  isListening = false;
+  if (activeSide) micBtnFor(activeSide).classList.remove("mic-active");
+}
+
+const continuousBtn = $("continuousBtn");
+const continuousDot = $("continuousDot");
+continuousBtn.addEventListener("click", () => {
+  continuousMode = !continuousMode;
+  continuousDot.style.background = continuousMode ? "#E8A33D" : "#4E706C";
+  continuousBtn.style.color = continuousMode ? "#F2EDE4" : "#8FADA9";
+  continuousBtn.style.borderColor = continuousMode ? "#E8A33D" : "#204442";
+  continuousBtn.lastChild.textContent = continuousMode ? "محادثة مستمرة: شغالة" : "محادثة مستمرة: متوقفة";
+  if (!continuousMode) stopListening();
+});
+
+micFromBtn.addEventListener("click", () => {
+  unlockAudio();
+  isListening && activeSide === "from" ? stopListening() : startListening("from");
+});
+micToBtn.addEventListener("click", () => {
+  unlockAudio();
+  isListening && activeSide === "to" ? stopListening() : startListening("to");
+});
+
+function detectLang(text) {
+  const trimmed = text.trim();
+  if (trimmed.length < 2) return null;
+  if (/[\u0600-\u06FF]/.test(trimmed)) return "ar-EG";
+  // Portuguese-specific accented characters / common words not typical in English
+  if (/[ãõçáéíóúàâêô]|\bnão\b|\bvocê\b|\bobrigad[oa]\b/i.test(trimmed)) return "pt-BR";
+  if (/^[a-zA-Z0-9\s.,!?'"-]+$/.test(trimmed)) return "en-US";
+  return null;
+}
+
+function autoSwitchLangForSide(side, text) {
+  const detected = detectLang(text);
+  if (!detected) return false;
+  const current = langForSide(side);
+  if (detected === current) return false;
+  if (side === "from") {
+    fromLang = detected;
+    if (toLang === fromLang) toLang = LANG_ORDER.find((l) => l !== fromLang);
+  } else {
+    toLang = detected;
+    if (fromLang === toLang) fromLang = LANG_ORDER.find((l) => l !== toLang);
+  }
+  fromSelect.value = fromLang;
+  toSelect.value = toLang;
+  refreshLabels();
+  return true;
+}
+
+sourceText.addEventListener("input", () => {
+  clearTimeout(debounceTimer);
+  debounceTimer = setTimeout(() => {
+    autoSwitchLangForSide("from", sourceText.value);
+    runTranslate("from", false);
+  }, 600);
+});
+
+// --- TTS output: device's own voice only (English/Portuguese work fine by default) ---
+function getVoicesAsync() {
+  return new Promise((resolve) => {
+    if (!window.speechSynthesis) return resolve([]);
+    const existing = window.speechSynthesis.getVoices();
+    if (existing.length > 0) return resolve(existing);
+    const handler = () => {
+      window.speechSynthesis.removeEventListener("voiceschanged", handler);
+      resolve(window.speechSynthesis.getVoices());
+    };
+    window.speechSynthesis.addEventListener("voiceschanged", handler);
+    setTimeout(() => resolve(window.speechSynthesis.getVoices()), 1200);
+  });
+}
+
+function speak(side) {
+  return new Promise((resolve) => {
+    const text = getBoxText(side);
+    if (!text.trim()) return resolve();
+    const langCode = langForSide(side);
+    getVoicesAsync().then((voices) => {
+      const targetSpeech = LANGS[langCode].speech;
+      const match =
+        voices.find((v) => v.lang === targetSpeech) ||
+        voices.find((v) => v.lang.replace("_", "-").toLowerCase().startsWith(langCode.split("-")[0].toLowerCase()));
+      if (!match) {
+        showBanner(`مفيش صوت متاح للغة "${LANGS[langCode].label}" على الجهاز ده`, "info");
+        return resolve();
+      }
+      window.speechSynthesis.cancel();
+      const utter = new SpeechSynthesisUtterance(text);
+      utter.voice = match;
+      utter.lang = match.lang;
+      utter.onend = resolve;
+      utter.onerror = () => { showBanner("مقدرتش أنطق الترجمة"); resolve(); };
+      window.speechSynthesis.speak(utter);
+    });
+  });
+}
+
+speakFromBtn.addEventListener("click", () => speak("from"));
+speakToBtn.addEventListener("click", () => speak("to"));
+
+// --- Settings modal ---
+const modalBackdrop = $("modalBackdrop");
+const apiKeyInput = $("apiKeyInput");
+$("settingsBtn").addEventListener("click", () => {
+  apiKeyInput.value = getApiKey();
+  modalBackdrop.classList.add("open");
+});
+$("modalCancel").addEventListener("click", () => modalBackdrop.classList.remove("open"));
+modalBackdrop.addEventListener("click", (e) => { if (e.target === modalBackdrop) modalBackdrop.classList.remove("open"); });
+$("modalSave").addEventListener("click", () => {
+  const val = apiKeyInput.value.trim();
+  if (val) localStorage.setItem(STORAGE_KEY, val);
+  else localStorage.removeItem(STORAGE_KEY);
+  modalBackdrop.classList.remove("open");
+  bannerHost.innerHTML = "";
+});
+
+$("diagBtn").addEventListener("click", async () => {
+  const out = $("diagOutput");
+  out.textContent = "بيدوّر...";
+  const voices = await getVoicesAsync();
+  if (!voices.length) {
+    out.textContent = "المتصفح مش بيرجع أي أصوات خالص (speechSynthesis فاضي).";
+    return;
+  }
+  out.textContent = voices.map((v) => `${v.lang} — ${v.name}${v.default ? " (default)" : ""}`).join("\n");
+});
+
+// --- Copy buttons ---
+async function copyText(text) {
+  if (!text.trim()) return;
+  try {
+    await navigator.clipboard.writeText(text);
+    showBanner("اتنسخ ✓", "info");
+  } catch (e) {
+    showBanner("مقدرتش أنسخ، جرب تحدد وتنسخ يدوي");
+  }
+}
+copyFromBtn.addEventListener("click", () => copyText(getBoxText("from")));
+copyToBtn.addEventListener("click", () => copyText(getBoxText("to")));
+
+// --- History ---
+function loadHistory() {
+  try {
+    return JSON.parse(localStorage.getItem(HISTORY_KEY) || "[]");
+  } catch (e) {
+    return [];
+  }
+}
+function saveHistory(from, to, sourceStr, resultStr) {
+  const list = loadHistory();
+  list.unshift({ from, to, source: sourceStr, result: resultStr, ts: Date.now() });
+  localStorage.setItem(HISTORY_KEY, JSON.stringify(list.slice(0, HISTORY_MAX)));
+}
+function renderHistory() {
+  const list = loadHistory();
+  const host = $("historyList");
+  if (!list.length) {
+    host.innerHTML = `<div class="list-empty">السجل فاضي لحد دلوقتي</div>`;
+    return;
+  }
+  host.innerHTML = list
+    .map(
+      (item, i) => `
+      <div class="list-item" data-idx="${i}">
+        <div>
+          <div class="list-item-text">${item.source}</div>
+          <div class="list-item-sub">${LANGS[item.from]?.label || item.from} → ${LANGS[item.to]?.label || item.to} · ${item.result}</div>
+        </div>
+      </div>`
+    )
+    .join("");
+  host.querySelectorAll(".list-item").forEach((el) => {
+    el.addEventListener("click", () => {
+      const item = list[Number(el.dataset.idx)];
+      if (LANGS[item.from]) { fromLang = item.from; fromSelect.value = fromLang; }
+      if (LANGS[item.to]) { toLang = item.to; toSelect.value = toLang; }
+      refreshLabels();
+      setBoxText("from", item.source, false);
+      setBoxText("to", item.result, false);
+      speakToBtn.disabled = false;
+      speakFromBtn.disabled = false;
+      historyBackdrop.classList.remove("open");
+    });
+  });
+}
+const historyBackdrop = $("historyBackdrop");
+historyBtn.addEventListener("click", () => {
+  renderHistory();
+  historyBackdrop.classList.add("open");
+});
+$("historyClose").addEventListener("click", () => historyBackdrop.classList.remove("open"));
+historyBackdrop.addEventListener("click", (e) => { if (e.target === historyBackdrop) historyBackdrop.classList.remove("open"); });
+$("historyClear").addEventListener("click", () => {
+  localStorage.removeItem(HISTORY_KEY);
+  renderHistory();
+});
+
+// --- Phrasebook ---
+const phrasesBackdrop = $("phrasesBackdrop");
+function renderPhrases() {
+  const phrases = PHRASEBOOK[fromLang] || [];
+  const host = $("phrasesList");
+  let currentCat = null;
+  let html = "";
+  phrases.forEach((p) => {
+    if (p.cat !== currentCat) {
+      currentCat = p.cat;
+      html += `<div class="list-item-sub" style="padding:10px 4px 2px;">${currentCat}</div>`;
+    }
+    html += `<div class="list-item" data-text="${p.text.replace(/"/g, "&quot;")}"><div class="list-item-text">${p.text}</div></div>`;
+  });
+  host.innerHTML = html;
+  host.querySelectorAll(".list-item").forEach((el) => {
+    el.addEventListener("click", () => {
+      setBoxText("from", el.dataset.text, false);
+      phrasesBackdrop.classList.remove("open");
+      clearTimeout(debounceTimer);
+      runTranslate("from", false);
+    });
+  });
+}
+phrasesBtn.addEventListener("click", () => {
+  renderPhrases();
+  phrasesBackdrop.classList.add("open");
+});
+$("phrasesClose").addEventListener("click", () => phrasesBackdrop.classList.remove("open"));
+phrasesBackdrop.addEventListener("click", (e) => { if (e.target === phrasesBackdrop) phrasesBackdrop.classList.remove("open"); });
+
+// --- Image translation (requires Anthropic API key — OCR needs vision) ---
+const imageBackdrop = $("imageBackdrop");
+const imageModalText = $("imageModalText");
+const imageSpinner = $("imageSpinner");
+const imagePreview = $("imagePreview");
+const imageDownloadRow = $("imageDownloadRow");
+let lastImageFile = null;
+let lastImageResult = "";
+
+function fileToBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result.split(",")[1]);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+imageBtn.addEventListener("click", () => imageInput.click());
+
+const OCR_LANG = { "ar-EG": "ara", "en-US": "eng", "pt-BR": "por" };
+
+function wrapCanvasText(ctx, text, maxWidth) {
+  const words = text.split(" ");
+  const lines = [];
+  let line = "";
+  for (const word of words) {
+    const test = line ? line + " " + word : word;
+    if (ctx.measureText(test).width > maxWidth && line) {
+      lines.push(line);
+      line = word;
+    } else {
+      line = test;
+    }
+  }
+  if (line) lines.push(line);
+  return lines;
+}
+
+function buildTranslatedImage(imgEl, translatedText, isRtl) {
+  const canvas = document.createElement("canvas");
+  const ctx = canvas.getContext("2d");
+  const w = imgEl.naturalWidth;
+  const fontSize = Math.max(18, Math.round(w * 0.035));
+  const padding = Math.round(fontSize * 0.8);
+  ctx.font = `${fontSize}px sans-serif`;
+  const maxTextWidth = w - padding * 2;
+  const lines = wrapCanvasText(ctx, translatedText, maxTextWidth);
+  const lineHeight = fontSize * 1.4;
+  const bannerHeight = lines.length * lineHeight + padding * 2;
+
+  canvas.width = w;
+  canvas.height = imgEl.naturalHeight + bannerHeight;
+  ctx.drawImage(imgEl, 0, 0, w, imgEl.naturalHeight);
+
+  ctx.fillStyle = "#0D1F1E";
+  ctx.fillRect(0, imgEl.naturalHeight, w, bannerHeight);
+
+  ctx.font = `${fontSize}px sans-serif`;
+  ctx.fillStyle = "#F2EDE4";
+  ctx.textBaseline = "top";
+  ctx.direction = isRtl ? "rtl" : "ltr";
+  ctx.textAlign = isRtl ? "right" : "left";
+  const textX = isRtl ? w - padding : padding;
+  lines.forEach((ln, i) => {
+    ctx.fillText(ln, textX, imgEl.naturalHeight + padding + i * lineHeight);
+  });
+
+  return canvas;
+}
+
+function triggerDownload(url, filename) {
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+}
+
+$("downloadTextBtn").addEventListener("click", () => {
+  if (!lastImageResult) return;
+  const blob = new Blob([lastImageResult], { type: "text/plain;charset=utf-8" });
+  triggerDownload(URL.createObjectURL(blob), "ترجمة.txt");
+});
+
+$("downloadImageBtn").addEventListener("click", () => {
+  if (!lastImageResult || !imagePreview.complete) return;
+  const isRtl = LANGS[toLang].dir === "rtl";
+  const canvas = buildTranslatedImage(imagePreview, lastImageResult, isRtl);
+  canvas.toBlob((blob) => {
+    triggerDownload(URL.createObjectURL(blob), "صورة-مترجمة.png");
+  }, "image/png");
+});
+
+imageInput.addEventListener("change", async () => {
+  const file = imageInput.files[0];
+  imageInput.value = ""; // allow re-selecting the same file later
+  if (!file) return;
+  lastImageFile = file;
+  lastImageResult = "";
+
+  const objectUrl = URL.createObjectURL(file);
+  imagePreview.src = objectUrl;
+  imagePreview.style.display = "block";
+  imageModalText.textContent = "بيحمّل محرك القراءة أول مرة (ممكن ياخد شوية وقت)...";
+  imageModalText.dir = "rtl";
+  imageSpinner.style.display = "inline-block";
+  imageDownloadRow.style.display = "none";
+  imageBackdrop.classList.add("open");
+
+  try {
+    const ocrLang = OCR_LANG[fromLang] || "eng";
+    const { data } = await Tesseract.recognize(file, ocrLang, {
+      logger: (m) => {
+        if (m.status === "recognizing text") {
+          imageModalText.textContent = `بيقرا النص... ${Math.round((m.progress || 0) * 100)}%`;
+        } else if (m.status) {
+          imageModalText.textContent = "بيحضّر محرك القراءة...";
+        }
+      },
+    });
+    const extractedText = (data?.text || "").trim();
+
+    if (!extractedText) {
+      imageSpinner.style.display = "none";
+      imageModalText.textContent = "مقدرتش ألاقي نص واضح في الصورة، جرب صورة أوضح أو أقرب";
+      return;
+    }
+
+    imageModalText.textContent = "بيترجم...";
+    const result = await translateText(extractedText, fromLang, toLang);
+
+    imageSpinner.style.display = "none";
+    if (!result) {
+      imageModalText.textContent = "قريت النص بس الترجمة فشلت، جرب تاني";
+      return;
+    }
+    imageModalText.textContent = result;
+    imageModalText.dir = LANGS[toLang].dir;
+    lastImageResult = result;
+    imageDownloadRow.style.display = "flex";
+    setBoxText("from", extractedText, false);
+    setBoxText("to", result, false);
+    speakToBtn.disabled = false;
+    speakFromBtn.disabled = false;
+    saveHistory(fromLang, toLang, "📷 " + extractedText, result);
+  } catch (err) {
+    imageSpinner.style.display = "none";
+    imageModalText.textContent = "فشلت: " + (err && err.message ? err.message : String(err));
+    imageModalText.dir = "rtl";
+  }
+});
+$("imageModalClose").addEventListener("click", () => imageBackdrop.classList.remove("open"));
+imageBackdrop.addEventListener("click", (e) => { if (e.target === imageBackdrop) imageBackdrop.classList.remove("open"); });
+
+// --- Init ---
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("sw.js").catch(() => {});
+  });
+}
+
+let deferredInstallPrompt = null;
+const installBtn = $("installBtn");
+window.addEventListener("beforeinstallprompt", (e) => {
+  e.preventDefault();
+  deferredInstallPrompt = e;
+  installBtn.style.display = "block";
+});
+installBtn.addEventListener("click", async () => {
+  if (!deferredInstallPrompt) return;
+  deferredInstallPrompt.prompt();
+  await deferredInstallPrompt.userChoice;
+  deferredInstallPrompt = null;
+  installBtn.style.display = "none";
+});
+window.addEventListener("appinstalled", () => {
+  installBtn.style.display = "none";
+});
+
+populateSelects();
+refreshLabels();
+if (!getApiKey()) {
+  showBanner('شغال دلوقتي بترجمة مجانية (أضعف في اللهجة المصرية) — لو عايز جودة Claude حط مفتاحك من ⚙', "info");
+}
+</script>
+</body>
+</html>
