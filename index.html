@@ -162,8 +162,8 @@
 
 <div class="wrap" style="margin-bottom:14px;">
   <button id="continuousBtn" style="width:100%; background:#12302E; border:1px solid #204442; color:#8FADA9; border-radius:10px; padding:10px; font-size:13px; font-family:'Space Grotesk',sans-serif; display:flex; align-items:center; justify-content:center; gap:8px; cursor:pointer;">
-    <span id="continuousDot" style="width:8px; height:8px; border-radius:50%; background:#4E706C;"></span>
-    محادثة مستمرة: متوقفة
+    <span id="continuousDot" style="width:8px; height:8px; border-radius:50%; background:#4E706C; flex-shrink:0;"></span>
+    <span id="convoLabel">محادثة تلقائية: متوقفة</span>
   </button>
 </div>
 
@@ -282,7 +282,8 @@ let fromLang = "ar-EG";
 let toLang = "en-US";
 let isListening = false;
 let isTranslating = false;
-let continuousMode = false;
+let conversationActive = false;
+let conversationPaused = false;
 let debounceTimer = null;
 let recognition = null;
 
@@ -481,12 +482,7 @@ async function runTranslate(side, autoSpeak) {
     const result = await translateText(text, langForSide(from), langForSide(to));
     setBoxText(to, result, !result);
     if (to === "to") speakToBtn.disabled = !result; else speakFromBtn.disabled = !result;
-    if (result && autoSpeak) {
-      await speak(to);
-      if (continuousMode && !isListening) {
-        setTimeout(() => startListening(to), 400);
-      }
-    }
+    if (result && autoSpeak) await speak(to);
     if (result) saveHistory(langForSide(from), langForSide(to), text, result);
   } catch (e) {
     // banner already shown
@@ -633,20 +629,133 @@ function stopListening() {
 
 const continuousBtn = $("continuousBtn");
 const continuousDot = $("continuousDot");
+const convoLabel = $("convoLabel");
+let convoRecognition = null;
+
+function setConvoStatus(text, color) {
+  convoLabel.textContent = text;
+  continuousDot.style.background = color;
+}
+
+function detectLangAmong(text, candidates) {
+  const trimmed = text.trim();
+  if (/[\u0600-\u06FF]/.test(trimmed) && candidates.includes("ar-EG")) return "ar-EG";
+  if (/[ãõçáéíóúàâêô]|\bnão\b|\bvocê\b|\bobrigad[oa]\b/i.test(trimmed) && candidates.includes("pt-BR")) return "pt-BR";
+  // No confident script/keyword match — fall back to whichever candidate isn't Portuguese,
+  // since plain unaccented Latin text is far more likely English than Portuguese.
+  return candidates.find((l) => l !== "pt-BR") || candidates[0];
+}
+
+function stopConversation() {
+  conversationActive = false;
+  conversationPaused = false;
+  if (convoRecognition) {
+    convoRecognition.onend = null;
+    convoRecognition.onresult = null;
+    convoRecognition.onerror = null;
+    try { convoRecognition.stop(); } catch (e) {}
+    convoRecognition = null;
+  }
+  continuousBtn.style.borderColor = "#204442";
+  setConvoStatus("محادثة تلقائية: متوقفة", "#4E706C");
+}
+
+async function startConversationTurn() {
+  if (!conversationActive) return;
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) {
+    showBanner("المتصفح ده مش بيدعم التسجيل الصوتي، جرب Chrome");
+    stopConversation();
+    return;
+  }
+
+  unlockAudio();
+  const granted = await requestMicAccess();
+  if (!granted) {
+    stopConversation();
+    return;
+  }
+  if (!conversationActive) return; // stopped while awaiting permission
+  bannerHost.innerHTML = "";
+
+  convoRecognition = new SR();
+  convoRecognition.lang = RECOGNITION_LANG[fromLang];
+  convoRecognition.interimResults = false;
+  convoRecognition.continuous = false;
+
+  convoRecognition.onstart = () => setConvoStatus("محادثة تلقائية: بتسمع...", "#E8A33D");
+
+  convoRecognition.onerror = (event) => {
+    if (event.error === "not-allowed" || event.error === "service-not-allowed") {
+      showMicPermissionHelp();
+      stopConversation();
+    }
+    // other errors (no-speech, aborted, network) are silently retried via onend
+  };
+
+  convoRecognition.onend = () => {
+    if (conversationActive && !conversationPaused) {
+      setTimeout(startConversationTurn, 300);
+    }
+  };
+
+  convoRecognition.onresult = async (event) => {
+    let finalTranscript = "";
+    for (let i = 0; i < event.results.length; i++) finalTranscript += event.results[i][0].transcript;
+    finalTranscript = finalTranscript.trim();
+    if (!finalTranscript) return;
+
+    conversationPaused = true;
+    setConvoStatus("محادثة تلقائية: بتترجم...", "#E8A33D");
+
+    const spokenLang = detectLangAmong(finalTranscript, [fromLang, toLang]);
+    const spokenSide = spokenLang === toLang ? "to" : "from";
+    const listenerSide = otherSide(spokenSide);
+
+    setBoxText(spokenSide, finalTranscript, false);
+    try {
+      const result = await translateText(finalTranscript, langForSide(spokenSide), langForSide(listenerSide));
+      setBoxText(listenerSide, result, !result);
+      if (listenerSide === "to") speakToBtn.disabled = !result; else speakFromBtn.disabled = !result;
+      if (result) {
+        saveHistory(langForSide(spokenSide), langForSide(listenerSide), finalTranscript, result);
+        setConvoStatus("محادثة تلقائية: بتنطق...", "#E8A33D");
+        await speak(listenerSide);
+      }
+    } catch (e) {
+      // banner already shown by translateText
+    }
+
+    conversationPaused = false;
+    if (conversationActive) startConversationTurn();
+  };
+
+  convoRecognition.start();
+}
+
 continuousBtn.addEventListener("click", () => {
-  continuousMode = !continuousMode;
-  continuousDot.style.background = continuousMode ? "#E8A33D" : "#4E706C";
-  continuousBtn.style.color = continuousMode ? "#F2EDE4" : "#8FADA9";
-  continuousBtn.style.borderColor = continuousMode ? "#E8A33D" : "#204442";
-  continuousBtn.lastChild.textContent = continuousMode ? "محادثة مستمرة: شغالة" : "محادثة مستمرة: متوقفة";
-  if (!continuousMode) stopListening();
+  if (conversationActive) {
+    stopConversation();
+  } else {
+    conversationActive = true;
+    continuousBtn.style.borderColor = "#E8A33D";
+    startConversationTurn();
+  }
 });
 
 micFromBtn.addEventListener("click", () => {
+  if (conversationActive) {
+    showBanner('وقّف "المحادثة تلقائية" الأول عشان تستخدم المايك اليدوي', "info");
+    return;
+  }
   unlockAudio();
   isListening && activeSide === "from" ? stopListening() : startListening("from");
 });
 micToBtn.addEventListener("click", () => {
+  if (conversationActive) {
+    showBanner('وقّف "المحادثة تلقائية" الأول عشان تستخدم المايك اليدوي', "info");
+    return;
+  }
   unlockAudio();
   isListening && activeSide === "to" ? stopListening() : startListening("to");
 });
