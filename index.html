@@ -334,16 +334,18 @@
     </div>
     <p style="font-size:12px; margin:0 0 10px; color:#8FADA9;">وجّه الكاميرا على النص. الترجمة بتتحدّث كل شوية تلقائي.</p>
     <div id="liveCamStage" style="position:relative; background:#000; border-radius:12px; overflow:hidden; aspect-ratio:3/4; max-height:60vh;">
-      <video id="liveCamVideo" playsinline muted autoplay style="width:100%; height:100%; object-fit:cover; background:#000;"></video>
-      <div id="liveCamOverlay" style="position:absolute; left:0; right:0; bottom:0; background:linear-gradient(transparent, rgba(0,0,0,0.85)); color:#fff; padding:16px 12px 12px; font-size:15px; min-height:80px; line-height:1.5;">
-        <div id="liveCamStatus" style="font-size:11px; opacity:0.7; margin-bottom:6px; font-family:'JetBrains Mono',monospace;">جاهز — وجّه الكاميرا على النص</div>
-        <div id="liveCamTranslation" style="font-weight:500;">—</div>
+      <video id="liveCamVideo" playsinline muted autoplay style="width:100%; height:100%; object-fit:contain; background:#000; display:block;"></video>
+      <canvas id="liveCamOverlayCanvas" style="position:absolute; inset:0; width:100%; height:100%; pointer-events:none;"></canvas>
+      <div id="liveCamOverlay" style="position:absolute; left:0; right:0; bottom:0; background:linear-gradient(transparent, rgba(0,0,0,0.85)); color:#fff; padding:16px 12px 12px; font-size:14px; min-height:60px; line-height:1.5;">
+        <div id="liveCamStatus" style="font-size:11px; opacity:0.7; margin-bottom:4px; font-family:'JetBrains Mono',monospace;">جاهز — وجّه الكاميرا على النص</div>
+        <div id="liveCamTranslation" style="font-weight:500; font-size:13px; max-height:60px; overflow:hidden;">—</div>
       </div>
     </div>
     <div style="display:flex; gap:8px; margin-top:12px; flex-wrap:wrap;">
       <button class="btn btn-primary" id="liveCamSnap" style="flex:1 1 40%;">📸 صور دلوقتي</button>
       <button class="btn btn-ghost" id="liveCamAutoToggle" style="flex:1 1 40%; background:#12302E; border:1px solid #204442;">▶ ابدأ تلقائي</button>
-      <button class="btn btn-ghost" id="liveCamSwitch" style="flex:1 1 100%; background:#12302E; border:1px solid #204442;">🔄 كاميرا أمامية/خلفية</button>
+      <button class="btn btn-ghost" id="liveCamOverlayToggle" style="flex:1 1 45%; background:#12302E; border:1px solid #204442;">🎯 Overlay: تشغيل</button>
+      <button class="btn btn-ghost" id="liveCamSwitch" style="flex:1 1 45%; background:#12302E; border:1px solid #204442;">🔄 كاميرا</button>
     </div>
   </div>
 </div>
@@ -1588,10 +1590,12 @@ imageBackdrop.addEventListener("click", (e) => { if (e.target === imageBackdrop)
 // ============================================================
 const liveCamBackdrop = $("liveCamBackdrop");
 const liveCamVideo = $("liveCamVideo");
+const liveCamOverlayCanvas = $("liveCamOverlayCanvas");
 const liveCamStatus = $("liveCamStatus");
 const liveCamTranslation = $("liveCamTranslation");
 const liveCamSnapBtn = $("liveCamSnap");
 const liveCamAutoBtn = $("liveCamAutoToggle");
+const liveCamOverlayBtn = $("liveCamOverlayToggle");
 const liveCamSwitchBtn = $("liveCamSwitch");
 const liveCamCloseBtn = $("liveCamClose");
 
@@ -1601,14 +1605,25 @@ let liveAutoTimer = null;
 let liveBusy = false;
 let liveLastOcrText = "";
 let liveTesseractWorker = null;
+let liveTesseractLang = null;
+let liveOverlayMode = true; // ON by default - draws translated text on video
+const liveTransCache = new Map(); // source text -> translated (per session)
 
 function setLiveStatus(msg) { liveCamStatus.textContent = msg; }
 
+function clearOverlayCanvas() {
+  const ctx = liveCamOverlayCanvas.getContext("2d");
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.clearRect(0, 0, liveCamOverlayCanvas.width, liveCamOverlayCanvas.height);
+}
+
 async function ensureLiveWorker() {
-  if (liveTesseractWorker) return liveTesseractWorker;
   const ocrLang = OCR_LANG[fromLang] || "eng";
+  if (liveTesseractWorker && liveTesseractLang === ocrLang) return liveTesseractWorker;
+  if (liveTesseractWorker) { try { await liveTesseractWorker.terminate(); } catch {} liveTesseractWorker = null; }
   setLiveStatus("بيحمّل محرك القراءة...");
   liveTesseractWorker = await Tesseract.createWorker(ocrLang);
+  liveTesseractLang = ocrLang;
   return liveTesseractWorker;
 }
 
@@ -1632,24 +1647,23 @@ function stopLiveStream() {
     liveStream = null;
   }
   liveCamVideo.srcObject = null;
+  clearOverlayCanvas();
 }
 
-function captureFrameToBlob() {
-  return new Promise((resolve) => {
-    if (!liveCamVideo.videoWidth) return resolve(null);
-    const canvas = document.createElement("canvas");
-    // Downscale to reduce OCR cost while keeping text legible
-    const maxW = 1024;
-    const scale = Math.min(1, maxW / liveCamVideo.videoWidth);
-    canvas.width = Math.round(liveCamVideo.videoWidth * scale);
-    canvas.height = Math.round(liveCamVideo.videoHeight * scale);
-    const ctx = canvas.getContext("2d");
-    ctx.drawImage(liveCamVideo, 0, 0, canvas.width, canvas.height);
-    canvas.toBlob(resolve, "image/jpeg", 0.85);
-  });
+// Grab a frame into a canvas + return {canvas, blob} at ~1024px width
+async function captureFrame() {
+  if (!liveCamVideo.videoWidth) return null;
+  const canvas = document.createElement("canvas");
+  const maxW = 1024;
+  const scale = Math.min(1, maxW / liveCamVideo.videoWidth);
+  canvas.width = Math.round(liveCamVideo.videoWidth * scale);
+  canvas.height = Math.round(liveCamVideo.videoHeight * scale);
+  const ctx = canvas.getContext("2d");
+  ctx.drawImage(liveCamVideo, 0, 0, canvas.width, canvas.height);
+  const blob = await new Promise((r) => canvas.toBlob(r, "image/jpeg", 0.85));
+  return { canvas, blob };
 }
 
-// Rough "did the scene change?" check based on text similarity
 function textIsSimilar(a, b) {
   if (!a || !b) return false;
   const norm = (s) => s.replace(/\s+/g, " ").trim().toLowerCase();
@@ -1661,32 +1675,186 @@ function textIsSimilar(a, b) {
   return longer.includes(shorter);
 }
 
+// The video uses object-fit: contain, so its actual painted rect is
+// letterboxed inside the element. Compute where the video content lives
+// in element coordinates so overlay boxes align pixel-perfect.
+function computeVideoDisplayRect() {
+  const elW = liveCamVideo.clientWidth;
+  const elH = liveCamVideo.clientHeight;
+  const vw = liveCamVideo.videoWidth || 1;
+  const vh = liveCamVideo.videoHeight || 1;
+  const elAR = elW / elH;
+  const vAR = vw / vh;
+  let dw, dh;
+  if (vAR > elAR) { dw = elW; dh = elW / vAR; }
+  else { dh = elH; dw = elH * vAR; }
+  return { left: (elW - dw) / 2, top: (elH - dh) / 2, width: dw, height: dh, vw, vh };
+}
+
+// Batch-translate an array of source strings, using in-session cache.
+// Uses Claude if API key present (much smarter about short/OCR text),
+// otherwise falls back to per-string MyMemory calls.
+async function batchTranslateLines(sources, from, to) {
+  const out = new Array(sources.length);
+  const missingIdx = [];
+  sources.forEach((s, i) => {
+    const key = `${from}::${to}::${s}`;
+    if (liveTransCache.has(key)) out[i] = liveTransCache.get(key);
+    else missingIdx.push(i);
+  });
+  if (!missingIdx.length) return out;
+
+  const apiKey = getApiKey();
+  if (apiKey) {
+    // One Claude round-trip for the whole batch — return one translation per line.
+    const items = missingIdx.map((i) => sources[i]);
+    const numbered = items.map((s, k) => `${k + 1}. ${s}`).join("\n");
+    const fromLabelEn = LANGS[from].labelEn;
+    const toLabelEn = LANGS[to].labelEn;
+    const system = to === "ar-EG"
+      ? `Translate each numbered line from ${fromLabelEn} into natural spoken Egyptian Arabic (Masri). Return ONLY the translations in the same numbered format, one per line, no extras.`
+      : `Translate each numbered line from ${fromLabelEn} into natural ${toLabelEn}. Return ONLY the translations in the same numbered format, one per line, no extras.`;
+    try {
+      const res = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": apiKey,
+          "anthropic-version": "2023-06-01",
+          "anthropic-dangerous-direct-browser-access": "true",
+        },
+        body: JSON.stringify({
+          model: getModel(),
+          max_tokens: 2000,
+          system,
+          messages: [{ role: "user", content: numbered }],
+        }),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      const data = await res.json();
+      const block = data.content.find((b) => b.type === "text");
+      const answered = (block ? block.text : "").split("\n").map((l) => l.replace(/^\s*\d+[.)]\s*/, "").trim());
+      missingIdx.forEach((idx, k) => {
+        const t = answered[k] || sources[idx];
+        out[idx] = t;
+        liveTransCache.set(`${from}::${to}::${sources[idx]}`, t);
+      });
+      return out;
+    } catch (e) {
+      // fall through to MyMemory
+    }
+  }
+  // Fallback: per-string MyMemory (rate-limited, but works without a key)
+  for (const idx of missingIdx) {
+    try {
+      const t = await translateWithMyMemory(sources[idx], from, to);
+      out[idx] = t;
+      liveTransCache.set(`${from}::${to}::${sources[idx]}`, t);
+    } catch {
+      out[idx] = sources[idx]; // give up, leave original
+    }
+  }
+  return out;
+}
+
+function drawOverlayBoxes(lines, translations, frameCanvas) {
+  const dpr = window.devicePixelRatio || 1;
+  const rect = computeVideoDisplayRect();
+  const elW = liveCamVideo.clientWidth;
+  const elH = liveCamVideo.clientHeight;
+  liveCamOverlayCanvas.width = Math.round(elW * dpr);
+  liveCamOverlayCanvas.height = Math.round(elH * dpr);
+  liveCamOverlayCanvas.style.width = elW + "px";
+  liveCamOverlayCanvas.style.height = elH + "px";
+  const ctx = liveCamOverlayCanvas.getContext("2d");
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, elW, elH);
+
+  const sx = rect.width / frameCanvas.width;
+  const sy = rect.height / frameCanvas.height;
+  const isRtl = LANGS[toLang].dir === "rtl";
+
+  lines.forEach((line, i) => {
+    const trans = translations[i];
+    if (!trans) return;
+    const b = line.bbox;
+    const x = rect.left + b.x0 * sx;
+    const y = rect.top + b.y0 * sy;
+    const w = (b.x1 - b.x0) * sx;
+    const h = (b.y1 - b.y0) * sy;
+    if (w < 10 || h < 8) return; // too tiny to be readable
+    // erase original
+    ctx.fillStyle = "rgba(20, 24, 28, 0.92)";
+    ctx.fillRect(x, y, w, h);
+    ctx.strokeStyle = "rgba(232, 163, 61, 0.6)";
+    ctx.lineWidth = 1;
+    ctx.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1);
+    // fit the translated text into the box
+    let fontSize = Math.max(11, Math.min(h * 0.72, 22));
+    ctx.fillStyle = "#F2EDE4";
+    ctx.font = `${fontSize}px 'Tajawal', 'Space Grotesk', sans-serif`;
+    ctx.textBaseline = "middle";
+    ctx.direction = isRtl ? "rtl" : "ltr";
+    ctx.textAlign = isRtl ? "right" : "left";
+    // If it doesn't fit, shrink until it does or hit min size
+    while (ctx.measureText(trans).width > w - 6 && fontSize > 9) {
+      fontSize -= 1;
+      ctx.font = `${fontSize}px 'Tajawal', 'Space Grotesk', sans-serif`;
+    }
+    const textX = isRtl ? x + w - 3 : x + 3;
+    const textY = y + h / 2;
+    ctx.fillText(trans, textX, textY);
+  });
+}
+
 async function scanFrameOnce({ forceTranslate = false } = {}) {
   if (liveBusy) return;
   liveBusy = true;
   try {
     setLiveStatus("بيصور و بيقرا...");
-    const blob = await captureFrameToBlob();
-    if (!blob) { setLiveStatus("الفيديو لسه ما جهزش"); return; }
+    const cap = await captureFrame();
+    if (!cap) { setLiveStatus("الفيديو لسه ما جهزش"); return; }
 
     const worker = await ensureLiveWorker();
-    const { data } = await worker.recognize(blob);
-    const extracted = (data?.text || "").trim();
-    if (!extracted) { setLiveStatus("مفيش نص واضح — قرّب أو ثبّت الكاميرا"); return; }
-
-    if (!forceTranslate && textIsSimilar(extracted, liveLastOcrText)) {
-      setLiveStatus("نفس النص — مش هترجم تاني");
+    const { data } = await worker.recognize(cap.canvas);
+    const wholeText = (data?.text || "").trim();
+    if (!wholeText) {
+      setLiveStatus("مفيش نص واضح — قرّب أو ثبّت الكاميرا");
+      if (liveOverlayMode) clearOverlayCanvas();
       return;
     }
-    liveLastOcrText = extracted;
 
-    setLiveStatus("بيترجم...");
-    const result = await translateText(extracted, fromLang, toLang);
-    if (!result) { setLiveStatus("الترجمة فشلت"); return; }
-    liveCamTranslation.textContent = result;
+    if (!forceTranslate && textIsSimilar(wholeText, liveLastOcrText)) {
+      setLiveStatus("نفس النص — الترجمة معروضة");
+      return;
+    }
+    liveLastOcrText = wholeText;
+
+    // Filter lines: skip empty/very short/tiny bbox
+    const lines = (data.lines || []).filter((l) => {
+      const t = (l.text || "").trim();
+      const w = l.bbox.x1 - l.bbox.x0;
+      const h = l.bbox.y1 - l.bbox.y0;
+      return t.length >= 2 && w > 20 && h > 8;
+    });
+
+    if (!lines.length) { setLiveStatus("مفيش سطور صالحة للترجمة"); return; }
+
+    setLiveStatus(`بيترجم ${lines.length} سطر...`);
+    const translations = await batchTranslateLines(
+      lines.map((l) => l.text.trim()),
+      fromLang, toLang
+    );
+
+    if (liveOverlayMode) {
+      drawOverlayBoxes(lines, translations, cap.canvas);
+    } else {
+      clearOverlayCanvas();
+    }
+    liveCamTranslation.textContent = translations.filter(Boolean).join(" · ").slice(0, 200);
     liveCamTranslation.dir = LANGS[toLang].dir;
-    setLiveStatus(`✓ ${extracted.slice(0, 60)}${extracted.length > 60 ? "..." : ""}`);
-    saveHistory(fromLang, toLang, "📸 " + extracted, result);
+    setLiveStatus(`✓ ${lines.length} سطر مترجم${liveOverlayMode ? " (overlay)" : ""}`);
+    saveHistory(fromLang, toLang, "📸 " + wholeText.slice(0, 200), translations.join("\n"));
   } catch (e) {
     setLiveStatus("مشكلة: " + (e.message || e));
   } finally {
@@ -1733,6 +1901,20 @@ liveCamAutoBtn.addEventListener("click", () => toggleLiveAuto());
 liveCamSwitchBtn.addEventListener("click", async () => {
   liveFacing = liveFacing === "environment" ? "user" : "environment";
   await startLiveStream();
+});
+liveCamOverlayBtn.addEventListener("click", () => {
+  liveOverlayMode = !liveOverlayMode;
+  liveCamOverlayBtn.textContent = liveOverlayMode ? "🎯 Overlay: تشغيل" : "🎯 Overlay: مقفول";
+  liveCamOverlayBtn.style.background = liveOverlayMode ? "#E8A33D" : "";
+  liveCamOverlayBtn.style.color = liveOverlayMode ? "#0D1F1E" : "";
+  if (!liveOverlayMode) clearOverlayCanvas();
+});
+// Init the overlay toggle to reflect default (ON)
+liveCamOverlayBtn.style.background = "#E8A33D";
+liveCamOverlayBtn.style.color = "#0D1F1E";
+// Repaint overlay on window resize so boxes stay aligned
+window.addEventListener("resize", () => {
+  if (liveCamBackdrop.classList.contains("open")) clearOverlayCanvas();
 });
 
 // --- Init ---
