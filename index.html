@@ -342,6 +342,9 @@
       <span style="font-size:10px; color:#6B8A87; font-family:'JetBrains Mono',monospace;">— اختار لغة النص في الكاميرا</span>
     </div>
     <p style="font-size:12px; margin:0 0 10px; color:#8FADA9;">وجّه الكاميرا على النص. الترجمة بتتحدّث كل شوية تلقائي.</p>
+    <div id="liveCamNoKeyWarn" style="display:none; background:#3A1F1C; border:1px solid #FF6F59; color:#FFB8A8; border-radius:8px; padding:8px 10px; font-size:12px; margin-bottom:10px; line-height:1.5;">
+      ⚠️ بدون مفتاح Claude، الكاميرا بتستخدم Tesseract (ضعيف مع النصوص الصغيرة والعربي). حط مفتاح من ⚙ عشان جودة أعلى بكتير.
+    </div>
     <div id="liveCamStage" style="position:relative; background:#000; border-radius:12px; overflow:hidden; aspect-ratio:3/4; max-height:60vh;">
       <video id="liveCamVideo" playsinline muted autoplay style="width:100%; height:100%; object-fit:contain; background:#000; display:block;"></video>
       <canvas id="liveCamOverlayCanvas" style="position:absolute; inset:0; width:100%; height:100%; pointer-events:none;"></canvas>
@@ -897,8 +900,12 @@ async function startConversationTurn() {
   convoRecognition = new SR();
   const listenLang = convoExpectedLang || fromLang;
   convoRecognition.lang = RECOGNITION_LANG[listenLang];
-  convoRecognition.interimResults = false;
+  // Interim results give the user visible feedback while they're speaking,
+  // so it doesn't feel like the app "disconnected" between finals.
+  convoRecognition.interimResults = true;
   convoRecognition.continuous = false;
+
+  let sawFinal = false;
 
   convoRecognition.onstart = () => {
     const listenerLabel = LANGS[listenLang]?.label || listenLang;
@@ -906,24 +913,41 @@ async function startConversationTurn() {
   };
 
   convoRecognition.onerror = (event) => {
+    // Silently retry on transient errors — do NOT stop the conversation.
+    // "no-speech" happens when the person hasn't started talking yet;
+    // "aborted"/"network" happen on brief connectivity blips.
     if (event.error === "not-allowed" || event.error === "service-not-allowed") {
       showMicPermissionHelp();
       stopConversation();
     }
-    // other errors (no-speech, aborted, network) are silently retried via onend
   };
 
   convoRecognition.onend = () => {
+    // Wait a beat before starting a new turn so the audio pipeline can reset
+    // and the previous speaker gets a moment before we barge in with the next
+    // recognition. Previous 300ms was too eager and made turns feel choppy.
     if (conversationActive && !conversationPaused) {
-      setTimeout(startConversationTurn, 300);
+      setTimeout(startConversationTurn, 900);
     }
   };
 
   convoRecognition.onresult = async (event) => {
+    // With interimResults=true we get partial results too; ignore them for
+    // translation but show a hint that we're hearing something.
+    let interim = "";
     let finalTranscript = "";
-    for (let i = 0; i < event.results.length; i++) finalTranscript += event.results[i][0].transcript;
+    for (let i = event.resultIndex; i < event.results.length; i++) {
+      const r = event.results[i];
+      if (r.isFinal) finalTranscript += r[0].transcript;
+      else interim += r[0].transcript;
+    }
+    if (interim && !finalTranscript) {
+      setConvoStatus(`محادثة تلقائية: "${interim.trim().slice(0, 40)}"`, "#E8A33D");
+      return;
+    }
     finalTranscript = finalTranscript.trim();
-    if (!finalTranscript) return;
+    if (!finalTranscript || sawFinal) return;
+    sawFinal = true;
 
     conversationPaused = true;
     setConvoStatus("محادثة تلقائية: بتترجم...", "#E8A33D");
@@ -1839,14 +1863,94 @@ function drawOverlayBoxes(lines, translations, frameCanvas) {
   });
 }
 
+// ---- Claude Vision path: MUCH better than Tesseract for real-world text ----
+// Sends the frame as base64 JPEG to Claude and gets back translated text
+// in one shot. No bounding boxes (Claude doesn't emit them), so overlay
+// mode falls back to a big translation banner over the video.
+async function scanFrameWithClaude(cap, apiKey) {
+  const bytes = await new Promise((r) => cap.blob.arrayBuffer().then(r));
+  // btoa doesn't handle raw bytes, need this trick for large binaries
+  let binary = "";
+  const arr = new Uint8Array(bytes);
+  const chunk = 0x8000;
+  for (let i = 0; i < arr.length; i += chunk) binary += String.fromCharCode.apply(null, arr.subarray(i, i + chunk));
+  const b64 = btoa(binary);
+
+  const targetLabelEn = LANGS[toLang].labelEn;
+  const system = toLang === "ar-EG"
+    ? `You are a live camera translator. Read ALL visible text in the image. Translate each distinct visible text block into natural spoken Egyptian Arabic (Masri) — not Modern Standard Arabic. Ignore small illegible marks. Return ONLY the translations, one per line, no numbering, no explanations, no source text. If the image has no readable text return exactly: NO_TEXT`
+    : `You are a live camera translator. Read ALL visible text in the image. Translate each distinct visible text block into natural ${targetLabelEn}. Ignore small illegible marks. Return ONLY the translations, one per line, no numbering, no explanations, no source text. If the image has no readable text return exactly: NO_TEXT`;
+
+  const res = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-api-key": apiKey,
+      "anthropic-version": "2023-06-01",
+      "anthropic-dangerous-direct-browser-access": "true",
+    },
+    body: JSON.stringify({
+      model: getModel(),
+      max_tokens: 800,
+      system,
+      messages: [{
+        role: "user",
+        content: [
+          { type: "image", source: { type: "base64", media_type: "image/jpeg", data: b64 } },
+          { type: "text", text: "Translate all visible text in this frame." }
+        ]
+      }],
+    }),
+  });
+  if (!res.ok) throw new Error("Claude Vision failed: " + res.status);
+  const data = await res.json();
+  const block = data.content.find((b) => b.type === "text");
+  const raw = (block ? block.text : "").trim();
+  if (!raw || /^NO_TEXT$/i.test(raw)) return { lines: [], text: "" };
+  const outLines = raw.split("\n").map((s) => s.replace(/^\s*[-•\d.)\s]+/, "").trim()).filter(Boolean);
+  return { lines: outLines, text: outLines.join("\n") };
+}
+
 async function scanFrameOnce({ forceTranslate = false } = {}) {
   if (liveBusy) return;
   liveBusy = true;
   try {
-    setLiveStatus("بيصور و بيقرا...");
     const cap = await captureFrame();
     if (!cap) { setLiveStatus("الفيديو لسه ما جهزش"); return; }
+    const apiKey = getApiKey();
 
+    // ============= FAST PATH: Claude Vision (needs API key) =============
+    if (apiKey) {
+      setLiveStatus("بيصور و بيترجم عبر Claude...");
+      const cached = liveTransCache.get(`vision::${toLang}::` + cap.canvas.width + "x" + cap.canvas.height);
+      // (Only content-level cache helps for identical frames; skip for now)
+      try {
+        const { lines: translated, text: joinedText } = await scanFrameWithClaude(cap, apiKey);
+        if (!translated.length) {
+          setLiveStatus("مفيش نص واضح — قرّب أو ثبّت الكاميرا");
+          if (liveOverlayMode) clearOverlayCanvas();
+          return;
+        }
+        if (!forceTranslate && textIsSimilar(joinedText, liveLastOcrText)) {
+          setLiveStatus("نفس المشهد — الترجمة معروضة");
+          return;
+        }
+        liveLastOcrText = joinedText;
+        // No bboxes from Claude → draw a translucent overlay panel on the video
+        drawTranslationBanner(translated);
+        liveCamTranslation.textContent = translated.join(" · ").slice(0, 200);
+        liveCamTranslation.dir = LANGS[toLang].dir;
+        setLiveStatus(`✓ ${translated.length} ترجمة (Claude)`);
+        saveHistory(fromLang, toLang, "📸 " + translated.join(" | ").slice(0, 100), translated.join("\n"));
+        return;
+      } catch (e) {
+        setLiveStatus("Claude فشل — بيرجع لـ Tesseract");
+        // fall through to Tesseract path
+      }
+    }
+
+    // ============= FALLBACK PATH: Tesseract + line-level overlay =============
+    setLiveStatus("بيصور و بيقرا (Tesseract — حط مفتاح Claude لجودة أعلى)");
     const worker = await ensureLiveWorker();
     const { data } = await worker.recognize(cap.canvas);
     const wholeText = (data?.text || "").trim();
@@ -1862,7 +1966,6 @@ async function scanFrameOnce({ forceTranslate = false } = {}) {
     }
     liveLastOcrText = wholeText;
 
-    // Filter lines: skip empty/very short/tiny bbox
     const lines = (data.lines || []).filter((l) => {
       const t = (l.text || "").trim();
       const w = l.bbox.x1 - l.bbox.x0;
@@ -1886,13 +1989,83 @@ async function scanFrameOnce({ forceTranslate = false } = {}) {
     }
     liveCamTranslation.textContent = translations.filter(Boolean).join(" · ").slice(0, 200);
     liveCamTranslation.dir = LANGS[toLang].dir;
-    setLiveStatus(`✓ ${lines.length} سطر مترجم${liveOverlayMode ? " (overlay)" : ""}`);
+    setLiveStatus(`✓ ${lines.length} سطر (Tesseract — جودة محدودة)`);
     saveHistory(ocrLang, toLang, "📸 " + wholeText.slice(0, 200), translations.join("\n"));
   } catch (e) {
     setLiveStatus("مشكلة: " + (e.message || e));
   } finally {
     liveBusy = false;
   }
+}
+
+// Draw a translucent banner near the bottom-center of the video with the Claude translations.
+// Used when we have translations but no bounding boxes (Claude Vision path).
+function drawTranslationBanner(translated) {
+  const dpr = window.devicePixelRatio || 1;
+  const rect = computeVideoDisplayRect();
+  const elW = liveCamVideo.clientWidth;
+  const elH = liveCamVideo.clientHeight;
+  liveCamOverlayCanvas.width = Math.round(elW * dpr);
+  liveCamOverlayCanvas.height = Math.round(elH * dpr);
+  liveCamOverlayCanvas.style.width = elW + "px";
+  liveCamOverlayCanvas.style.height = elH + "px";
+  const ctx = liveCamOverlayCanvas.getContext("2d");
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, elW, elH);
+
+  const isRtl = LANGS[toLang].dir === "rtl";
+  const panelW = Math.min(rect.width * 0.9, 480);
+  const padding = 12;
+  const fontSize = 16;
+  const lineHeight = fontSize * 1.5;
+
+  ctx.font = `${fontSize}px 'Tajawal', 'Space Grotesk', sans-serif`;
+
+  // wrap each translation to fit inside panelW
+  const wrappedLines = [];
+  translated.forEach((t) => {
+    const words = t.split(" ");
+    let line = "";
+    for (const word of words) {
+      const test = line ? line + " " + word : word;
+      if (ctx.measureText(test).width > panelW - padding * 2 && line) {
+        wrappedLines.push(line);
+        line = word;
+      } else {
+        line = test;
+      }
+    }
+    if (line) wrappedLines.push(line);
+    wrappedLines.push(""); // spacer between blocks
+  });
+  wrappedLines.pop(); // trailing spacer
+
+  const panelH = wrappedLines.length * lineHeight + padding * 2;
+  const x = rect.left + (rect.width - panelW) / 2;
+  const y = rect.top + rect.height - panelH - 20;
+
+  ctx.fillStyle = "rgba(13, 31, 30, 0.92)";
+  ctx.strokeStyle = "rgba(232, 163, 61, 0.7)";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  const r = 12;
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + panelW, y, x + panelW, y + panelH, r);
+  ctx.arcTo(x + panelW, y + panelH, x, y + panelH, r);
+  ctx.arcTo(x, y + panelH, x, y, r);
+  ctx.arcTo(x, y, x + panelW, y, r);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+
+  ctx.fillStyle = "#F2EDE4";
+  ctx.direction = isRtl ? "rtl" : "ltr";
+  ctx.textAlign = isRtl ? "right" : "left";
+  ctx.textBaseline = "top";
+  const textX = isRtl ? x + panelW - padding : x + padding;
+  wrappedLines.forEach((line, i) => {
+    ctx.fillText(line, textX, y + padding + i * lineHeight);
+  });
 }
 
 const LIVE_SCAN_INTERVAL_MS = 2000; // how often to scan when auto mode is running
@@ -1927,13 +2100,11 @@ async function openLiveCam() {
   // Default OCR lang follows fromLang the first time; user can override in the modal.
   liveOcrLangCode = liveOcrLangCode || fromLang;
   if (liveCamOcrLangSelect) liveCamOcrLangSelect.value = liveOcrLangCode;
+  // Show/hide the "no API key" warning banner
+  $("liveCamNoKeyWarn").style.display = getApiKey() ? "none" : "block";
   liveCamBackdrop.classList.add("open");
   const ok = await startLiveStream();
-  // Kick off continuous auto-scan immediately so the user just points and reads,
-  // no button press required. Only if the stream came up cleanly.
-  if (ok && !liveAutoTimer) {
-    toggleLiveAuto(true);
-  }
+  if (ok && !liveAutoTimer) toggleLiveAuto(true);
 }
 
 function closeLiveCam() {
