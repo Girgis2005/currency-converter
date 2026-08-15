@@ -328,9 +328,18 @@
 
 <div class="modal-backdrop" id="liveCamBackdrop">
   <div class="modal" style="max-width:520px; padding:14px;">
-    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-      <h2 style="margin:0;">كاميرا مباشرة</h2>
-      <button class="btn btn-ghost" id="liveCamClose" style="padding:4px 10px;">✕ قفل</button>
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; gap:10px;">
+      <h2 style="margin:0; flex:1;">كاميرا مباشرة</h2>
+      <button type="button" class="btn btn-primary" id="liveCamClose" style="padding:10px 16px; font-weight:700; min-width:70px; min-height:44px;" aria-label="قفل الكاميرا">✕ قفل</button>
+    </div>
+    <div style="display:flex; gap:6px; margin-bottom:10px; align-items:center; flex-wrap:wrap;">
+      <label style="font-size:11px; color:#8FADA9; font-family:'JetBrains Mono',monospace;">OCR:</label>
+      <select id="liveCamOcrLang" style="background:#0D1F1E; border:1px solid #204442; border-radius:8px; color:#F2EDE4; padding:6px 10px; font-size:12px; font-family:'Space Grotesk',sans-serif;">
+        <option value="ar-EG">مصري (عربي)</option>
+        <option value="en-US">English</option>
+        <option value="pt-BR">Português</option>
+      </select>
+      <span style="font-size:10px; color:#6B8A87; font-family:'JetBrains Mono',monospace;">— اختار لغة النص في الكاميرا</span>
     </div>
     <p style="font-size:12px; margin:0 0 10px; color:#8FADA9;">وجّه الكاميرا على النص. الترجمة بتتحدّث كل شوية تلقائي.</p>
     <div id="liveCamStage" style="position:relative; background:#000; border-radius:12px; overflow:hidden; aspect-ratio:3/4; max-height:60vh;">
@@ -1285,7 +1294,12 @@ document.addEventListener("keydown", (e) => {
   // Ignore if a modal is open (except escape)
   const anyModalOpen = document.querySelector(".modal-backdrop.open");
   if (e.key === "Escape" && anyModalOpen) {
-    anyModalOpen.classList.remove("open");
+    // Live cam modal needs full teardown (stop media stream, clear canvas)
+    if (anyModalOpen.id === "liveCamBackdrop" && typeof closeLiveCam === "function") {
+      closeLiveCam();
+    } else {
+      anyModalOpen.classList.remove("open");
+    }
     return;
   }
   if (anyModalOpen) return;
@@ -1607,6 +1621,7 @@ let liveLastOcrText = "";
 let liveTesseractWorker = null;
 let liveTesseractLang = null;
 let liveOverlayMode = true; // ON by default - draws translated text on video
+let liveOcrLangCode = null; // explicit OCR lang (BCP-47), overrides fromLang. Set on modal open.
 const liveTransCache = new Map(); // source text -> translated (per session)
 
 function setLiveStatus(msg) { liveCamStatus.textContent = msg; }
@@ -1617,8 +1632,9 @@ function clearOverlayCanvas() {
   ctx.clearRect(0, 0, liveCamOverlayCanvas.width, liveCamOverlayCanvas.height);
 }
 
+function getLiveOcrLang() { return liveOcrLangCode || fromLang; }
 async function ensureLiveWorker() {
-  const ocrLang = OCR_LANG[fromLang] || "eng";
+  const ocrLang = OCR_LANG[getLiveOcrLang()] || "eng";
   if (liveTesseractWorker && liveTesseractLang === ocrLang) return liveTesseractWorker;
   if (liveTesseractWorker) { try { await liveTesseractWorker.terminate(); } catch {} liveTesseractWorker = null; }
   setLiveStatus("بيحمّل محرك القراءة...");
@@ -1840,10 +1856,11 @@ async function scanFrameOnce({ forceTranslate = false } = {}) {
 
     if (!lines.length) { setLiveStatus("مفيش سطور صالحة للترجمة"); return; }
 
-    setLiveStatus(`بيترجم ${lines.length} سطر...`);
+    const ocrLang = getLiveOcrLang();
+    setLiveStatus(`بيترجم ${lines.length} سطر (${LANGS[ocrLang].label} → ${LANGS[toLang].label})...`);
     const translations = await batchTranslateLines(
       lines.map((l) => l.text.trim()),
-      fromLang, toLang
+      ocrLang, toLang
     );
 
     if (liveOverlayMode) {
@@ -1854,7 +1871,7 @@ async function scanFrameOnce({ forceTranslate = false } = {}) {
     liveCamTranslation.textContent = translations.filter(Boolean).join(" · ").slice(0, 200);
     liveCamTranslation.dir = LANGS[toLang].dir;
     setLiveStatus(`✓ ${lines.length} سطر مترجم${liveOverlayMode ? " (overlay)" : ""}`);
-    saveHistory(fromLang, toLang, "📸 " + wholeText.slice(0, 200), translations.join("\n"));
+    saveHistory(ocrLang, toLang, "📸 " + wholeText.slice(0, 200), translations.join("\n"));
   } catch (e) {
     setLiveStatus("مشكلة: " + (e.message || e));
   } finally {
@@ -1880,22 +1897,32 @@ function toggleLiveAuto(force) {
   }
 }
 
+const liveCamOcrLangSelect = $("liveCamOcrLang");
+
 async function openLiveCam() {
   liveCamTranslation.textContent = "—";
   liveLastOcrText = "";
+  // Default OCR lang follows fromLang the first time; user can override in the modal.
+  liveOcrLangCode = liveOcrLangCode || fromLang;
+  if (liveCamOcrLangSelect) liveCamOcrLangSelect.value = liveOcrLangCode;
   liveCamBackdrop.classList.add("open");
   await startLiveStream();
 }
 
 function closeLiveCam() {
-  toggleLiveAuto(false);
-  stopLiveStream();
+  // Defensive: guard each step so a failure early doesn't leave the modal stuck.
+  try { toggleLiveAuto(false); } catch (e) { console.warn("toggleLiveAuto:", e); }
+  try { stopLiveStream(); } catch (e) { console.warn("stopLiveStream:", e); }
   liveCamBackdrop.classList.remove("open");
+  liveCamBackdrop.style.removeProperty("display"); // belt-and-suspenders in case something set inline display
 }
 
+// Multiple close paths so a single stuck event handler can't trap the user.
 $("cameraBtn").addEventListener("click", openLiveCam);
 liveCamCloseBtn.addEventListener("click", closeLiveCam);
+liveCamCloseBtn.addEventListener("touchend", (e) => { e.preventDefault(); closeLiveCam(); }, { passive: false });
 liveCamBackdrop.addEventListener("click", (e) => { if (e.target === liveCamBackdrop) closeLiveCam(); });
+
 liveCamSnapBtn.addEventListener("click", () => scanFrameOnce({ forceTranslate: true }));
 liveCamAutoBtn.addEventListener("click", () => toggleLiveAuto());
 liveCamSwitchBtn.addEventListener("click", async () => {
@@ -1908,6 +1935,12 @@ liveCamOverlayBtn.addEventListener("click", () => {
   liveCamOverlayBtn.style.background = liveOverlayMode ? "#E8A33D" : "";
   liveCamOverlayBtn.style.color = liveOverlayMode ? "#0D1F1E" : "";
   if (!liveOverlayMode) clearOverlayCanvas();
+});
+liveCamOcrLangSelect.addEventListener("change", () => {
+  liveOcrLangCode = liveCamOcrLangSelect.value;
+  liveLastOcrText = ""; // force re-scan since OCR pack changes
+  clearOverlayCanvas();
+  setLiveStatus(`OCR اتضبط على ${LANGS[liveOcrLangCode].label} — دوس صور دلوقتي`);
 });
 // Init the overlay toggle to reflect default (ON)
 liveCamOverlayBtn.style.background = "#E8A33D";
