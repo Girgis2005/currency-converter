@@ -342,8 +342,8 @@
       <span style="font-size:10px; color:#6B8A87; font-family:'JetBrains Mono',monospace;">— اختار لغة النص في الكاميرا</span>
     </div>
     <p style="font-size:12px; margin:0 0 10px; color:#8FADA9;">وجّه الكاميرا على النص. الترجمة بتتحدّث كل شوية تلقائي.</p>
-    <div id="liveCamNoKeyWarn" style="display:none; background:#3A1F1C; border:1px solid #FF6F59; color:#FFB8A8; border-radius:8px; padding:8px 10px; font-size:12px; margin-bottom:10px; line-height:1.5;">
-      ⚠️ بدون مفتاح Claude، الكاميرا بتستخدم Tesseract (ضعيف مع النصوص الصغيرة والعربي). حط مفتاح من ⚙ عشان جودة أعلى بكتير.
+    <div id="liveCamNoKeyWarn" style="display:none; background:#17322F; border:1px solid #2B5350; color:#C8DEDA; border-radius:8px; padding:8px 10px; font-size:12px; margin-bottom:10px; line-height:1.5;">
+      ℹ️ شغال بالنظام المجاني (Chrome OCR + Google Translate). لو عايز جودة أعلى (خاصة لهجة مصرية طبيعية) حط مفتاح Claude من ⚙.
     </div>
     <div id="liveCamStage" style="position:relative; background:#000; border-radius:12px; overflow:hidden; aspect-ratio:3/4; max-height:60vh;">
       <video id="liveCamVideo" playsinline muted autoplay style="width:100%; height:100%; object-fit:contain; background:#000; display:block;"></video>
@@ -596,6 +596,20 @@ function getModel() {
 
 const ISO_CODE = { "ar-EG": "ar", "en-US": "en", "pt-BR": "pt" };
 
+// Google Translate's free web endpoint (used by countless browser extensions).
+// No API key, no signup. Handles Arabic, English, Portuguese cleanly.
+// Response shape: [ [ [ "translated", "source", null, null, N ], ... ], ..., "detected-lang", ... ]
+async function translateWithGoogleFree(text, from, to) {
+  const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=${ISO_CODE[from]}&tl=${ISO_CODE[to]}&dt=t&q=${encodeURIComponent(text)}`;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error("Google free request failed: " + res.status);
+  const data = await res.json();
+  if (!Array.isArray(data) || !Array.isArray(data[0])) throw new Error("Google free unexpected shape");
+  const combined = data[0].map((seg) => (seg && seg[0]) || "").join("").trim();
+  if (!combined) throw new Error("Google free returned empty");
+  return combined;
+}
+
 async function translateWithMyMemory(text, from, to) {
   const langpair = `${ISO_CODE[from]}|${ISO_CODE[to]}`;
   const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=${langpair}`;
@@ -607,13 +621,20 @@ async function translateWithMyMemory(text, from, to) {
   return result;
 }
 
+// Free fallback chain: try Google first (much better quality), then MyMemory.
+async function translateWithFreeChain(text, from, to) {
+  try { return await translateWithGoogleFree(text, from, to); }
+  catch (e) { /* fall through */ }
+  return await translateWithMyMemory(text, from, to);
+}
+
 async function translateText(text, from, to) {
   const apiKey = getApiKey();
 
   if (!apiKey) {
-    // Free fallback so the app works before billing is set up.
-    // Quality is lower (standard Arabic, not Egyptian dialect).
-    return await translateWithMyMemory(text, from, to);
+    // Free fallback: Google's public web endpoint first (better than MyMemory
+    // for real sentences), MyMemory as backup. Both handle AR/EN/PT.
+    return await translateWithFreeChain(text, from, to);
   }
 
   const fromLabelEn = LANGS[from].labelEn;
@@ -1657,6 +1678,35 @@ function clearOverlayCanvas() {
 }
 
 function getLiveOcrLang() { return liveOcrLangCode || fromLang; }
+
+// Native OCR via TextDetector API — available on Chrome for Android (Google ML
+// Kit under the hood). Way better than Tesseract for real-world photos, and
+// gives us bounding boxes so we can still draw a Google-Lens-style overlay.
+// Returns null if the API isn't supported.
+const HAS_TEXT_DETECTOR = typeof window.TextDetector === "function";
+let _textDetector = null;
+async function scanFrameWithNativeDetector(cap) {
+  if (!HAS_TEXT_DETECTOR) return null;
+  try {
+    if (!_textDetector) _textDetector = new window.TextDetector();
+    const bitmap = await createImageBitmap(cap.blob);
+    const results = await _textDetector.detect(bitmap);
+    // TextDetector.boundingBox is a DOMRectReadOnly {x, y, width, height}
+    return results.map((r) => ({
+      text: (r.rawValue || "").trim(),
+      bbox: {
+        x0: r.boundingBox.x,
+        y0: r.boundingBox.y,
+        x1: r.boundingBox.x + r.boundingBox.width,
+        y1: r.boundingBox.y + r.boundingBox.height,
+      },
+    })).filter((l) => l.text.length >= 2);
+  } catch (e) {
+    console.warn("TextDetector failed:", e);
+    return null;
+  }
+}
+
 async function ensureLiveWorker() {
   const ocrLang = OCR_LANG[getLiveOcrLang()] || "eng";
   if (liveTesseractWorker && liveTesseractLang === ocrLang) return liveTesseractWorker;
@@ -1800,10 +1850,10 @@ async function batchTranslateLines(sources, from, to) {
       // fall through to MyMemory
     }
   }
-  // Fallback: per-string MyMemory (rate-limited, but works without a key)
+  // Free fallback: per-string via Google free chain (much better than MyMemory alone)
   for (const idx of missingIdx) {
     try {
-      const t = await translateWithMyMemory(sources[idx], from, to);
+      const t = await translateWithFreeChain(sources[idx], from, to);
       out[idx] = t;
       liveTransCache.set(`${from}::${to}::${sources[idx]}`, t);
     } catch {
@@ -1949,47 +1999,70 @@ async function scanFrameOnce({ forceTranslate = false } = {}) {
       }
     }
 
-    // ============= FALLBACK PATH: Tesseract + line-level overlay =============
-    setLiveStatus("بيصور و بيقرا (Tesseract — حط مفتاح Claude لجودة أعلى)");
-    const worker = await ensureLiveWorker();
-    const { data } = await worker.recognize(cap.canvas);
-    const wholeText = (data?.text || "").trim();
-    if (!wholeText) {
-      setLiveStatus("مفيش نص واضح — قرّب أو ثبّت الكاميرا");
-      if (liveOverlayMode) clearOverlayCanvas();
-      return;
+    // ============= FREE PATH #1: Native TextDetector (Android Chrome) =============
+    let lines = null;
+    let ocrEngineName = null;
+    let frameCanvasForOverlay = cap.canvas;
+
+    if (HAS_TEXT_DETECTOR) {
+      setLiveStatus("بيصور و بيقرا (Chrome OCR — مجاني)");
+      const detected = await scanFrameWithNativeDetector(cap);
+      if (detected && detected.length) {
+        // TextDetector bboxes are in the ORIGINAL frame coords (same as cap.canvas since we sized cap to source),
+        // so overlay math works with cap.canvas as the reference.
+        lines = detected.filter((l) => {
+          const w = l.bbox.x1 - l.bbox.x0;
+          const h = l.bbox.y1 - l.bbox.y0;
+          return w > 20 && h > 8;
+        });
+        ocrEngineName = "Chrome OCR";
+      }
     }
 
+    // ============= FREE PATH #2: Tesseract fallback =============
+    if (!lines) {
+      setLiveStatus("بيصور و بيقرا (Tesseract)");
+      const worker = await ensureLiveWorker();
+      const { data } = await worker.recognize(cap.canvas);
+      const wholeText = (data?.text || "").trim();
+      if (!wholeText) {
+        setLiveStatus("مفيش نص واضح — قرّب أو ثبّت الكاميرا");
+        if (liveOverlayMode) clearOverlayCanvas();
+        return;
+      }
+      lines = (data.lines || []).filter((l) => {
+        const t = (l.text || "").trim();
+        const w = l.bbox.x1 - l.bbox.x0;
+        const h = l.bbox.y1 - l.bbox.y0;
+        return t.length >= 2 && w > 20 && h > 8;
+      });
+      ocrEngineName = "Tesseract";
+    }
+
+    if (!lines.length) { setLiveStatus("مفيش سطور صالحة للترجمة"); return; }
+
+    const wholeText = lines.map((l) => l.text.trim()).join(" ");
     if (!forceTranslate && textIsSimilar(wholeText, liveLastOcrText)) {
       setLiveStatus("نفس النص — الترجمة معروضة");
       return;
     }
     liveLastOcrText = wholeText;
 
-    const lines = (data.lines || []).filter((l) => {
-      const t = (l.text || "").trim();
-      const w = l.bbox.x1 - l.bbox.x0;
-      const h = l.bbox.y1 - l.bbox.y0;
-      return t.length >= 2 && w > 20 && h > 8;
-    });
-
-    if (!lines.length) { setLiveStatus("مفيش سطور صالحة للترجمة"); return; }
-
     const ocrLang = getLiveOcrLang();
-    setLiveStatus(`بيترجم ${lines.length} سطر (${LANGS[ocrLang].label} → ${LANGS[toLang].label})...`);
+    setLiveStatus(`بيترجم ${lines.length} سطر (${ocrEngineName} → ${LANGS[toLang].label})...`);
     const translations = await batchTranslateLines(
       lines.map((l) => l.text.trim()),
       ocrLang, toLang
     );
 
     if (liveOverlayMode) {
-      drawOverlayBoxes(lines, translations, cap.canvas);
+      drawOverlayBoxes(lines, translations, frameCanvasForOverlay);
     } else {
       clearOverlayCanvas();
     }
     liveCamTranslation.textContent = translations.filter(Boolean).join(" · ").slice(0, 200);
     liveCamTranslation.dir = LANGS[toLang].dir;
-    setLiveStatus(`✓ ${lines.length} سطر (Tesseract — جودة محدودة)`);
+    setLiveStatus(`✓ ${lines.length} سطر (${ocrEngineName})`);
     saveHistory(ocrLang, toLang, "📸 " + wholeText.slice(0, 200), translations.join("\n"));
   } catch (e) {
     setLiveStatus("مشكلة: " + (e.message || e));
