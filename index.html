@@ -4,6 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>جسر · Gesr — مترجم فوري</title>
+<meta name="description" content="Instant translator between Egyptian Arabic, English, and Brazilian Portuguese — text, voice, image OCR. PWA that works offline." />
 <link rel="manifest" href="manifest.json" />
 <meta name="theme-color" content="#0D1F1E" />
 <meta name="mobile-web-app-capable" content="yes" />
@@ -12,6 +13,14 @@
 <meta name="apple-mobile-web-app-title" content="جسر" />
 <link rel="icon" href="icons/icon-192.png" />
 <link rel="apple-touch-icon" href="icons/icon-192.png" />
+<meta property="og:title" content="جسر · Gesr — مترجم فوري" />
+<meta property="og:description" content="Egyptian ↔ English ↔ Portuguese instant translator with voice, image OCR, and offline PWA." />
+<meta property="og:image" content="icons/icon-512.png" />
+<meta property="og:type" content="website" />
+<meta name="twitter:card" content="summary" />
+<meta name="twitter:title" content="جسر · Gesr" />
+<meta name="twitter:description" content="Egyptian ↔ English ↔ Portuguese instant translator." />
+<meta name="twitter:image" content="icons/icon-512.png" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;900&family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
@@ -88,11 +97,29 @@
     background: #1F4744; color: #E8A33D;
   }
   .icon-btn:disabled { color: #3E5C59; cursor: default; }
+  .icon-btn.active { background: #E8A33D; color: #0D1F1E; }
   textarea, .output {
     width: 100%; min-height: 90px; background: transparent; border: none;
     color: #F2EDE4; font-size: 17px; line-height: 1.5; resize: none; padding: 0;
     font-family: inherit;
   }
+  .char-count {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px; color: #4E706C; text-align: end; margin-top: 4px;
+  }
+  .char-count.warn { color: #E8A33D; }
+  /* Light theme overrides (applied when <html data-theme="light">) */
+  html[data-theme="light"] body { background: #F7F4EC; color: #1F2D2C; }
+  html[data-theme="light"] .card { background: #FFFFFF; border-color: #D9E0DE; }
+  html[data-theme="light"] select { background: #FFFFFF; border-color: #D9E0DE; color: #1F2D2C; }
+  html[data-theme="light"] .icon-btn { background: #EFE6D3; color: #B57019; }
+  html[data-theme="light"] .swap-btn, html[data-theme="light"] .settings-btn { background: #EFE6D3; border-color: #D9E0DE; color: #B57019; }
+  html[data-theme="light"] .modal { background: #FFFFFF; border-color: #D9E0DE; }
+  html[data-theme="light"] .modal input, html[data-theme="light"] .modal select { background: #F7F4EC; border-color: #D9E0DE; color: #1F2D2C; }
+  html[data-theme="light"] textarea, html[data-theme="light"] .output { color: #1F2D2C; }
+  html[data-theme="light"] .subtitle { color: #5A6B69; }
+  html[data-theme="light"] .card-label, html[data-theme="light"] .footnote, html[data-theme="light"] .list-item-sub { color: #7A8987; }
+  html[data-theme="light"] textarea::placeholder, html[data-theme="light"] .output.placeholder { color: #97A5A3; }
   .output.placeholder { color: #4E706C; display: flex; align-items: center; }
   .bridge { display: flex; gap: 5px; margin: 10px 0; height: 14px; align-items: center; }
   .bridge-line { width: 28px; height: 1px; background: #2B5350; }
@@ -177,6 +204,7 @@
     </div>
   </div>
   <textarea id="sourceText" placeholder="اكتب أو دوس المايك واتكلم..."></textarea>
+  <div class="char-count" id="sourceCharCount">0</div>
 </div>
 
 <div class="wrap bridge" id="bridge">
@@ -187,6 +215,8 @@
   <div class="card-header">
     <span class="card-label" id="toLabel"></span>
     <div style="display:flex; gap:8px;">
+      <button class="icon-btn" id="favBtn" disabled aria-label="أضف للمفضلة">☆</button>
+      <button class="icon-btn" id="shareBtn" disabled aria-label="شارك الترجمة">📤</button>
       <button class="icon-btn" id="micToBtn" aria-label="سجل صوت">🎙</button>
       <button class="icon-btn" id="speakToBtn" disabled aria-label="اسمع الترجمة">🔊</button>
       <button class="icon-btn" id="copyToBtn" aria-label="انسخ الترجمة">📋</button>
@@ -195,12 +225,15 @@
   <div class="output placeholder" id="outputText">هتظهر الترجمة هنا</div>
 </div>
 
-<div class="wrap" style="display:flex; gap:8px; margin-top:14px;">
-  <button class="btn btn-ghost" id="imageBtn" style="flex:1; background:#12302E; border:1px solid #204442; display:flex; align-items:center; justify-content:center; gap:6px;">📷 ترجمة صورة (مجاني)</button>
-  <button class="btn btn-ghost" id="phrasesBtn" style="flex:1; background:#12302E; border:1px solid #204442; display:flex; align-items:center; justify-content:center; gap:6px;">💬 عبارات جاهزة</button>
-  <button class="btn btn-ghost" id="historyBtn" style="flex:1; background:#12302E; border:1px solid #204442; display:flex; align-items:center; justify-content:center; gap:6px;">🕘 السجل</button>
+<div class="wrap" style="display:flex; gap:8px; margin-top:14px; flex-wrap:wrap;">
+  <button class="btn btn-ghost" id="imageBtn" style="flex:1 1 45%; background:#12302E; border:1px solid #204442; display:flex; align-items:center; justify-content:center; gap:6px;">📷 صورة</button>
+  <button class="btn btn-ghost" id="cameraBtn" style="flex:1 1 45%; background:#12302E; border:1px solid #204442; display:flex; align-items:center; justify-content:center; gap:6px;">📸 كاميرا</button>
+  <button class="btn btn-ghost" id="phrasesBtn" style="flex:1 1 45%; background:#12302E; border:1px solid #204442; display:flex; align-items:center; justify-content:center; gap:6px;">💬 عبارات</button>
+  <button class="btn btn-ghost" id="favoritesBtn" style="flex:1 1 45%; background:#12302E; border:1px solid #204442; display:flex; align-items:center; justify-content:center; gap:6px;">⭐ المفضلة</button>
+  <button class="btn btn-ghost" id="historyBtn" style="flex:1 1 100%; background:#12302E; border:1px solid #204442; display:flex; align-items:center; justify-content:center; gap:6px;">🕘 السجل</button>
 </div>
 <input type="file" id="imageInput" accept="image/*" style="display:none;" />
+<input type="file" id="cameraInput" accept="image/*" capture="environment" style="display:none;" />
 
 <p class="footnote">وضع محادثة: كل واحد يدوس المايك اللي جنبه ويتكلم بلغته — التسجيل الصوتي وقراءة النص شغالين أحسن على Chrome</p>
 
@@ -215,11 +248,21 @@
       (لازم تشحن رصيد من Billing حتى لو بسيط عشان يشتغل).
     </p>
     <input type="password" id="apiKeyInput" placeholder="sk-ant-..." />
+    <label style="display:block; font-size:12px; color:#8FADA9; margin-bottom:6px;">موديل Claude</label>
+    <select id="modelSelect" style="width:100%; background:#0D1F1E; border:1px solid #204442; border-radius:10px; color:#F2EDE4; padding:10px 12px; font-size:14px; font-family:'Space Grotesk',sans-serif; margin-bottom:14px;">
+      <option value="claude-sonnet-4-5">Sonnet 4.5 (متوازن — الافتراضي)</option>
+      <option value="claude-haiku-4-5">Haiku 4.5 (أسرع وأرخص)</option>
+      <option value="claude-opus-4-5">Opus 4.5 (أعلى جودة)</option>
+    </select>
     <div class="modal-actions">
       <button class="btn btn-ghost" id="modalCancel">إلغاء</button>
       <button class="btn btn-primary" id="modalSave">حفظ</button>
     </div>
     <div style="margin-top:16px; border-top:1px solid #204442; padding-top:14px;">
+      <button class="btn btn-ghost" id="themeToggleBtn" style="padding:8px 0;">🎨 تبديل الثيم (داكن/فاتح)</button>
+      <button class="btn btn-ghost" id="exportBtn" style="padding:8px 0;">⬇ صدّر السجل + المفضلة (JSON)</button>
+      <button class="btn btn-ghost" id="importBtn" style="padding:8px 0;">⬆ استرجع من JSON</button>
+      <input type="file" id="importInput" accept="application/json" style="display:none;" />
       <button class="btn btn-ghost" id="installBtn" style="padding:8px 0; display:none;">⬇ ثبّت التطبيق على الشاشة الرئيسية</button>
       <button class="btn btn-ghost" id="diagBtn" style="padding:8px 0;">🔍 شوف الأصوات المتاحة على الجهاز</button>
       <pre id="diagOutput" style="white-space:pre-wrap; font-size:11px; font-family:'JetBrains Mono',monospace; color:#8FADA9; margin-top:8px; max-height:200px; overflow-y:auto;"></pre>
@@ -245,6 +288,18 @@
     <div class="modal-actions" style="margin-top:14px;">
       <button class="btn btn-ghost" id="historyClear">امسح السجل</button>
       <button class="btn btn-primary" id="historyClose">قفل</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="favoritesBackdrop">
+  <div class="modal">
+    <h2>الترجمات المفضلة</h2>
+    <p>الترجمات اللي ضغطت عليها ⭐ بتتحفظ هنا للرجوع.</p>
+    <div class="modal-scroll" id="favoritesList"></div>
+    <div class="modal-actions" style="margin-top:14px;">
+      <button class="btn btn-ghost" id="favoritesClear">امسح المفضلة</button>
+      <button class="btn btn-primary" id="favoritesClose">قفل</button>
     </div>
   </div>
 </div>
@@ -277,6 +332,11 @@ const LANGS = {
 };
 const LANG_ORDER = ["ar-EG", "en-US", "pt-BR"];
 const STORAGE_KEY = "gesr_anthropic_key";
+const MODEL_KEY = "gesr_anthropic_model";
+const DEFAULT_MODEL = "claude-sonnet-4-5";
+const THEME_KEY = "gesr_theme";
+const FAV_KEY = "gesr_favorites";
+const FAV_MAX = 100;
 
 let fromLang = "ar-EG";
 let toLang = "en-US";
@@ -312,44 +372,131 @@ const PHRASEBOOK = {
   "ar-EG": [
     { cat: "تحية", text: "إزيك عامل إيه" },
     { cat: "تحية", text: "صباح الخير" },
+    { cat: "تحية", text: "مساء الخير" },
     { cat: "تحية", text: "شكرًا جدًا" },
     { cat: "تحية", text: "من فضلك" },
     { cat: "تحية", text: "آسف" },
-    { cat: "أرقام", text: "بكام ده" },
-    { cat: "أرقام", text: "واحد اتنين تلاتة" },
-    { cat: "اتجاهات", text: "فين الحمام" },
-    { cat: "اتجاهات", text: "يمين ولا شمال" },
-    { cat: "اتجاهات", text: "قريب من هنا" },
+    { cat: "تحية", text: "أنا مش بتكلم برتغالي كويس" },
+    { cat: "تحية", text: "ممكن تتكلم إنجليزي" },
+    { cat: "أرقام و فلوس", text: "بكام ده" },
+    { cat: "أرقام و فلوس", text: "غالي أوي" },
+    { cat: "أرقام و فلوس", text: "بتقبل بطاقة" },
+    { cat: "أرقام و فلوس", text: "هل عندك بيكس (Pix)" },
+    { cat: "أرقام و فلوس", text: "الفاتورة من فضلك" },
+    { cat: "اتجاهات و مواصلات", text: "فين الحمام" },
+    { cat: "اتجاهات و مواصلات", text: "يمين ولا شمال" },
+    { cat: "اتجاهات و مواصلات", text: "قريب من هنا" },
+    { cat: "اتجاهات و مواصلات", text: "محطة المترو فين" },
+    { cat: "اتجاهات و مواصلات", text: "عايز أوبر" },
+    { cat: "اتجاهات و مواصلات", text: "الوصول ياخد قد إيه" },
+    { cat: "أكل و مطاعم", text: "قائمة الطعام من فضلك" },
+    { cat: "أكل و مطاعم", text: "أنا مش بأكل لحمة" },
+    { cat: "أكل و مطاعم", text: "من غير سكر" },
+    { cat: "أكل و مطاعم", text: "المياه من فضلك" },
+    { cat: "أكل و مطاعم", text: "الأكل ده حلو أوي" },
+    { cat: "سكن و إيجار", text: "الشقة متاحة" },
+    { cat: "سكن و إيجار", text: "الإيجار بكام" },
+    { cat: "سكن و إيجار", text: "التأمين بكام" },
+    { cat: "سكن و إيجار", text: "الفواتير مشمولة" },
+    { cat: "بنك و مصلحة", text: "عايز أفتح حساب بنكي" },
+    { cat: "بنك و مصلحة", text: "محتاج الـ CPF بتاعي" },
+    { cat: "بنك و مصلحة", text: "فين أقرب بنك" },
+    { cat: "شغل", text: "أنا مطور مواقع" },
+    { cat: "شغل", text: "بشتغل remote" },
+    { cat: "شغل", text: "بأدور على شغل فريلانس" },
+    { cat: "دكتور و صحة", text: "أنا تعبان" },
+    { cat: "دكتور و صحة", text: "عندي حساسية" },
+    { cat: "دكتور و صحة", text: "محتاج صيدلية" },
     { cat: "طوارئ", text: "محتاج مساعدة" },
     { cat: "طوارئ", text: "اتصل بالإسعاف" },
+    { cat: "طوارئ", text: "اتصل بالبوليس" },
+    { cat: "طوارئ", text: "ضاعت مني ورقي" },
   ],
   "en-US": [
-    { cat: "Greeting", text: "How are you doing" },
-    { cat: "Greeting", text: "Good morning" },
-    { cat: "Greeting", text: "Thank you very much" },
-    { cat: "Greeting", text: "Please" },
-    { cat: "Greeting", text: "Sorry" },
-    { cat: "Numbers", text: "How much is this" },
-    { cat: "Numbers", text: "One two three" },
-    { cat: "Directions", text: "Where is the bathroom" },
-    { cat: "Directions", text: "Left or right" },
-    { cat: "Directions", text: "Is it close by" },
+    { cat: "Greetings", text: "How are you doing" },
+    { cat: "Greetings", text: "Good morning" },
+    { cat: "Greetings", text: "Good evening" },
+    { cat: "Greetings", text: "Thank you very much" },
+    { cat: "Greetings", text: "Please" },
+    { cat: "Greetings", text: "Sorry" },
+    { cat: "Greetings", text: "I don't speak Portuguese well" },
+    { cat: "Greetings", text: "Do you speak English" },
+    { cat: "Numbers & money", text: "How much is this" },
+    { cat: "Numbers & money", text: "That's too expensive" },
+    { cat: "Numbers & money", text: "Do you take card" },
+    { cat: "Numbers & money", text: "Do you have Pix" },
+    { cat: "Numbers & money", text: "The bill please" },
+    { cat: "Directions & transport", text: "Where is the bathroom" },
+    { cat: "Directions & transport", text: "Left or right" },
+    { cat: "Directions & transport", text: "Is it close by" },
+    { cat: "Directions & transport", text: "Where is the metro station" },
+    { cat: "Directions & transport", text: "I need an Uber" },
+    { cat: "Directions & transport", text: "How long does it take" },
+    { cat: "Food & restaurants", text: "Menu please" },
+    { cat: "Food & restaurants", text: "I don't eat meat" },
+    { cat: "Food & restaurants", text: "Without sugar" },
+    { cat: "Food & restaurants", text: "Water please" },
+    { cat: "Food & restaurants", text: "This food is delicious" },
+    { cat: "Housing & rent", text: "Is the apartment available" },
+    { cat: "Housing & rent", text: "How much is rent" },
+    { cat: "Housing & rent", text: "How much is the deposit" },
+    { cat: "Housing & rent", text: "Are bills included" },
+    { cat: "Bank & admin", text: "I want to open a bank account" },
+    { cat: "Bank & admin", text: "I need my CPF" },
+    { cat: "Bank & admin", text: "Where is the nearest bank" },
+    { cat: "Work", text: "I am a software developer" },
+    { cat: "Work", text: "I work remotely" },
+    { cat: "Work", text: "I'm looking for freelance work" },
+    { cat: "Doctor & health", text: "I feel sick" },
+    { cat: "Doctor & health", text: "I have allergies" },
+    { cat: "Doctor & health", text: "I need a pharmacy" },
     { cat: "Emergency", text: "I need help" },
     { cat: "Emergency", text: "Call an ambulance" },
+    { cat: "Emergency", text: "Call the police" },
+    { cat: "Emergency", text: "I lost my documents" },
   ],
   "pt-BR": [
-    { cat: "Saudação", text: "Como você está" },
-    { cat: "Saudação", text: "Bom dia" },
-    { cat: "Saudação", text: "Muito obrigado" },
-    { cat: "Saudação", text: "Por favor" },
-    { cat: "Saudação", text: "Desculpa" },
-    { cat: "Números", text: "Quanto custa isso" },
-    { cat: "Números", text: "Um dois três" },
-    { cat: "Direções", text: "Onde fica o banheiro" },
-    { cat: "Direções", text: "Esquerda ou direita" },
-    { cat: "Direções", text: "É perto daqui" },
+    { cat: "Saudações", text: "Como você está" },
+    { cat: "Saudações", text: "Bom dia" },
+    { cat: "Saudações", text: "Boa noite" },
+    { cat: "Saudações", text: "Muito obrigado" },
+    { cat: "Saudações", text: "Por favor" },
+    { cat: "Saudações", text: "Desculpa" },
+    { cat: "Saudações", text: "Eu não falo bem português" },
+    { cat: "Saudações", text: "Você fala inglês" },
+    { cat: "Números e dinheiro", text: "Quanto custa isso" },
+    { cat: "Números e dinheiro", text: "Está muito caro" },
+    { cat: "Números e dinheiro", text: "Aceita cartão" },
+    { cat: "Números e dinheiro", text: "Tem Pix" },
+    { cat: "Números e dinheiro", text: "A conta por favor" },
+    { cat: "Direções e transporte", text: "Onde fica o banheiro" },
+    { cat: "Direções e transporte", text: "Esquerda ou direita" },
+    { cat: "Direções e transporte", text: "É perto daqui" },
+    { cat: "Direções e transporte", text: "Onde fica a estação de metrô" },
+    { cat: "Direções e transporte", text: "Preciso de um Uber" },
+    { cat: "Direções e transporte", text: "Quanto tempo demora" },
+    { cat: "Comida e restaurantes", text: "O cardápio por favor" },
+    { cat: "Comida e restaurantes", text: "Não como carne" },
+    { cat: "Comida e restaurantes", text: "Sem açúcar" },
+    { cat: "Comida e restaurantes", text: "Água por favor" },
+    { cat: "Comida e restaurantes", text: "Essa comida está deliciosa" },
+    { cat: "Moradia e aluguel", text: "O apartamento está disponível" },
+    { cat: "Moradia e aluguel", text: "Quanto é o aluguel" },
+    { cat: "Moradia e aluguel", text: "Quanto é a caução" },
+    { cat: "Moradia e aluguel", text: "As contas estão incluídas" },
+    { cat: "Banco e burocracia", text: "Quero abrir uma conta bancária" },
+    { cat: "Banco e burocracia", text: "Preciso do meu CPF" },
+    { cat: "Banco e burocracia", text: "Onde fica o banco mais próximo" },
+    { cat: "Trabalho", text: "Sou desenvolvedor de software" },
+    { cat: "Trabalho", text: "Trabalho remotamente" },
+    { cat: "Trabalho", text: "Estou procurando trabalho freelancer" },
+    { cat: "Médico e saúde", text: "Estou me sentindo mal" },
+    { cat: "Médico e saúde", text: "Tenho alergia" },
+    { cat: "Médico e saúde", text: "Preciso de uma farmácia" },
     { cat: "Emergência", text: "Preciso de ajuda" },
     { cat: "Emergência", text: "Chame uma ambulância" },
+    { cat: "Emergência", text: "Chame a polícia" },
+    { cat: "Emergência", text: "Perdi meus documentos" },
   ],
 };
 
@@ -384,6 +531,9 @@ function showBanner(message, type = "error") {
 
 function getApiKey() {
   return localStorage.getItem(STORAGE_KEY) || "";
+}
+function getModel() {
+  return localStorage.getItem(MODEL_KEY) || DEFAULT_MODEL;
 }
 
 const ISO_CODE = { "ar-EG": "ar", "en-US": "en", "pt-BR": "pt" };
@@ -423,7 +573,7 @@ async function translateText(text, from, to) {
       "anthropic-dangerous-direct-browser-access": "true",
     },
     body: JSON.stringify({
-      model: "claude-sonnet-4-6",
+      model: getModel(),
       max_tokens: 1000,
       system,
       messages: [{ role: "user", content: text }],
@@ -475,6 +625,7 @@ async function runTranslate(side, autoSpeak) {
   if (!text.trim()) {
     setBoxText(to, to === "to" ? "هتظهر الترجمة هنا" : "", true);
     if (to === "to") speakToBtn.disabled = true; else speakFromBtn.disabled = true;
+    if (typeof refreshFavStar === "function") refreshFavStar();
     return;
   }
   setTranslating(true);
@@ -488,6 +639,7 @@ async function runTranslate(side, autoSpeak) {
     // banner already shown
   } finally {
     setTranslating(false);
+    if (typeof refreshFavStar === "function") refreshFavStar();
   }
 }
 
@@ -518,6 +670,8 @@ swapBtn.addEventListener("click", () => {
   speakToBtn.disabled = !srcVal;
   speakFromBtn.disabled = !outVal;
   refreshLabels();
+  updateCharCount();
+  if (typeof refreshFavStar === "function") refreshFavStar();
 });
 
 // --- Mic input (works for either side: "from" or "to") ---
@@ -794,7 +948,15 @@ function autoSwitchLangForSide(side, text) {
   return true;
 }
 
+const CHAR_WARN = 800;
+const sourceCharCount = $("sourceCharCount");
+function updateCharCount() {
+  const n = sourceText.value.length;
+  sourceCharCount.textContent = String(n);
+  sourceCharCount.classList.toggle("warn", n > CHAR_WARN);
+}
 sourceText.addEventListener("input", () => {
+  updateCharCount();
   clearTimeout(debounceTimer);
   debounceTimer = setTimeout(() => {
     autoSwitchLangForSide("from", sourceText.value);
@@ -848,8 +1010,10 @@ speakToBtn.addEventListener("click", () => speak("to"));
 // --- Settings modal ---
 const modalBackdrop = $("modalBackdrop");
 const apiKeyInput = $("apiKeyInput");
+const modelSelect = $("modelSelect");
 $("settingsBtn").addEventListener("click", () => {
   apiKeyInput.value = getApiKey();
+  modelSelect.value = getModel();
   modalBackdrop.classList.add("open");
 });
 $("modalCancel").addEventListener("click", () => modalBackdrop.classList.remove("open"));
@@ -858,8 +1022,195 @@ $("modalSave").addEventListener("click", () => {
   const val = apiKeyInput.value.trim();
   if (val) localStorage.setItem(STORAGE_KEY, val);
   else localStorage.removeItem(STORAGE_KEY);
+  localStorage.setItem(MODEL_KEY, modelSelect.value || DEFAULT_MODEL);
   modalBackdrop.classList.remove("open");
   bannerHost.innerHTML = "";
+});
+
+// --- Theme toggle (light / dark) ---
+function applyTheme(t) {
+  const theme = t === "light" ? "light" : "dark";
+  document.documentElement.setAttribute("data-theme", theme);
+  const themeColor = theme === "light" ? "#F7F4EC" : "#0D1F1E";
+  document.querySelector('meta[name="theme-color"]').setAttribute("content", themeColor);
+}
+applyTheme(localStorage.getItem(THEME_KEY) || "dark");
+$("themeToggleBtn").addEventListener("click", () => {
+  const current = document.documentElement.getAttribute("data-theme") || "dark";
+  const next = current === "light" ? "dark" : "light";
+  localStorage.setItem(THEME_KEY, next);
+  applyTheme(next);
+});
+
+// --- Favorites (⭐ starred translations) ---
+const favBtn = $("favBtn");
+const shareBtn = $("shareBtn");
+const favoritesBackdrop = $("favoritesBackdrop");
+
+function loadFavorites() {
+  try { return JSON.parse(localStorage.getItem(FAV_KEY) || "[]"); }
+  catch { return []; }
+}
+function saveFavorites(list) { localStorage.setItem(FAV_KEY, JSON.stringify(list.slice(0, FAV_MAX))); }
+function isFavorited(sourceStr, resultStr) {
+  return loadFavorites().some((f) => f.source === sourceStr && f.result === resultStr);
+}
+function refreshFavStar() {
+  const src = sourceText.value;
+  const out = outputText.classList.contains("placeholder") ? "" : outputText.textContent;
+  if (!src.trim() || !out.trim()) {
+    favBtn.disabled = true;
+    favBtn.textContent = "☆";
+    favBtn.classList.remove("active");
+    shareBtn.disabled = true;
+    return;
+  }
+  favBtn.disabled = false;
+  shareBtn.disabled = false;
+  const on = isFavorited(src, out);
+  favBtn.textContent = on ? "★" : "☆";
+  favBtn.classList.toggle("active", on);
+}
+favBtn.addEventListener("click", () => {
+  const src = sourceText.value;
+  const out = outputText.classList.contains("placeholder") ? "" : outputText.textContent;
+  if (!src.trim() || !out.trim()) return;
+  const list = loadFavorites();
+  const existing = list.findIndex((f) => f.source === src && f.result === out);
+  if (existing >= 0) {
+    list.splice(existing, 1);
+    showBanner("اتشال من المفضلة", "info");
+  } else {
+    list.unshift({ from: fromLang, to: toLang, source: src, result: out, ts: Date.now() });
+    showBanner("اتحفظ في المفضلة ★", "info");
+  }
+  saveFavorites(list);
+  refreshFavStar();
+});
+function renderFavorites() {
+  const list = loadFavorites();
+  const host = $("favoritesList");
+  if (!list.length) {
+    host.innerHTML = `<div class="list-empty">مفيش مفضلة لحد دلوقتي</div>`;
+    return;
+  }
+  host.innerHTML = list.map((item, i) => `
+      <div class="list-item" data-idx="${i}">
+        <div>
+          <div class="list-item-text">${item.source}</div>
+          <div class="list-item-sub">${LANGS[item.from]?.label || item.from} → ${LANGS[item.to]?.label || item.to} · ${item.result}</div>
+        </div>
+      </div>`).join("");
+  host.querySelectorAll(".list-item").forEach((el) => {
+    el.addEventListener("click", () => {
+      const item = list[Number(el.dataset.idx)];
+      if (LANGS[item.from]) { fromLang = item.from; fromSelect.value = fromLang; }
+      if (LANGS[item.to]) { toLang = item.to; toSelect.value = toLang; }
+      refreshLabels();
+      setBoxText("from", item.source, false);
+      setBoxText("to", item.result, false);
+      speakToBtn.disabled = false;
+      speakFromBtn.disabled = false;
+      updateCharCount();
+      refreshFavStar();
+      favoritesBackdrop.classList.remove("open");
+    });
+  });
+}
+$("favoritesBtn").addEventListener("click", () => { renderFavorites(); favoritesBackdrop.classList.add("open"); });
+$("favoritesClose").addEventListener("click", () => favoritesBackdrop.classList.remove("open"));
+favoritesBackdrop.addEventListener("click", (e) => { if (e.target === favoritesBackdrop) favoritesBackdrop.classList.remove("open"); });
+$("favoritesClear").addEventListener("click", () => {
+  if (!confirm("متأكد إنك عايز تمسح كل المفضلة؟")) return;
+  localStorage.removeItem(FAV_KEY);
+  renderFavorites();
+  refreshFavStar();
+});
+
+// --- Share (Web Share API with clipboard fallback) ---
+shareBtn.addEventListener("click", async () => {
+  const src = sourceText.value.trim();
+  const out = outputText.classList.contains("placeholder") ? "" : outputText.textContent.trim();
+  if (!src || !out) return;
+  const shareText = `${src}\n\n→ ${out}\n\n— جسر Gesr`;
+  if (navigator.share) {
+    try { await navigator.share({ text: shareText, title: "ترجمة من جسر" }); }
+    catch (e) { /* user cancelled - ignore */ }
+  } else {
+    try { await navigator.clipboard.writeText(shareText); showBanner("النص اتنسخ للمشاركة ✓", "info"); }
+    catch { showBanner("مقدرش أشارك على الجهاز ده"); }
+  }
+});
+
+// --- Camera capture (reuses the same file input flow as imageInput) ---
+const cameraInput = $("cameraInput");
+$("cameraBtn").addEventListener("click", () => cameraInput.click());
+cameraInput.addEventListener("change", () => {
+  if (!cameraInput.files.length) return;
+  // Copy the picked file into imageInput so its existing handler runs unchanged
+  const dt = new DataTransfer();
+  dt.items.add(cameraInput.files[0]);
+  imageInput.files = dt.files;
+  imageInput.dispatchEvent(new Event("change"));
+  cameraInput.value = "";
+});
+
+// --- Export / Import (history + favorites bundle) ---
+$("exportBtn").addEventListener("click", () => {
+  const payload = {
+    app: "gesr",
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    history: loadHistory(),
+    favorites: loadFavorites(),
+  };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  triggerDownload(url, `gesr-backup-${new Date().toISOString().slice(0,10)}.json`);
+});
+const importInput = $("importInput");
+$("importBtn").addEventListener("click", () => importInput.click());
+importInput.addEventListener("change", async () => {
+  const file = importInput.files[0];
+  importInput.value = "";
+  if (!file) return;
+  try {
+    const text = await file.text();
+    const data = JSON.parse(text);
+    if (data.app !== "gesr") throw new Error("Not a Gesr backup");
+    if (Array.isArray(data.history)) localStorage.setItem(HISTORY_KEY, JSON.stringify(data.history.slice(0, HISTORY_MAX)));
+    if (Array.isArray(data.favorites)) localStorage.setItem(FAV_KEY, JSON.stringify(data.favorites.slice(0, FAV_MAX)));
+    showBanner("اتاسترجع ✓", "info");
+  } catch (e) {
+    showBanner("الملف مش صحيح: " + (e.message || e));
+  }
+});
+
+// --- Keyboard shortcuts ---
+document.addEventListener("keydown", (e) => {
+  // Ignore if a modal is open (except escape)
+  const anyModalOpen = document.querySelector(".modal-backdrop.open");
+  if (e.key === "Escape" && anyModalOpen) {
+    anyModalOpen.classList.remove("open");
+    return;
+  }
+  if (anyModalOpen) return;
+  // Ctrl+Enter in sourceText: force immediate translate + speak
+  if ((e.ctrlKey || e.metaKey) && e.key === "Enter" && document.activeElement === sourceText) {
+    e.preventDefault();
+    clearTimeout(debounceTimer);
+    runTranslate("from", true);
+  }
+  // Ctrl+/ toggle theme
+  if ((e.ctrlKey || e.metaKey) && e.key === "/") {
+    e.preventDefault();
+    $("themeToggleBtn").click();
+  }
+  // Ctrl+Shift+S -> swap
+  if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === "s" || e.key === "S")) {
+    e.preventDefault();
+    swapBtn.click();
+  }
 });
 
 $("diagBtn").addEventListener("click", async () => {
@@ -1157,6 +1508,8 @@ window.addEventListener("appinstalled", () => {
 
 populateSelects();
 refreshLabels();
+updateCharCount();
+refreshFavStar();
 if (!getApiKey()) {
   showBanner('شغال دلوقتي بترجمة مجانية (أضعف في اللهجة المصرية) — لو عايز جودة Claude حط مفتاحك من ⚙', "info");
 }

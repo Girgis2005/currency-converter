@@ -1,4 +1,4 @@
-const CACHE_NAME = "gesr-shell-v1";
+const CACHE_NAME = "gesr-shell-v2";
 const SHELL_FILES = ["./", "./index.html", "./manifest.json", "./icons/icon-192.png", "./icons/icon-512.png"];
 
 self.addEventListener("install", (event) => {
