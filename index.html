@@ -120,6 +120,27 @@
   html[data-theme="light"] .subtitle { color: #5A6B69; }
   html[data-theme="light"] .card-label, html[data-theme="light"] .footnote, html[data-theme="light"] .list-item-sub { color: #7A8987; }
   html[data-theme="light"] textarea::placeholder, html[data-theme="light"] .output.placeholder { color: #97A5A3; }
+  /* Buttons that use inline dark colors — force light-theme equivalent via CSS override */
+  html[data-theme="light"] #continuousBtn,
+  html[data-theme="light"] #imageBtn,
+  html[data-theme="light"] #cameraBtn,
+  html[data-theme="light"] #phrasesBtn,
+  html[data-theme="light"] #favoritesBtn,
+  html[data-theme="light"] #historyBtn {
+    background: #FFFFFF !important;
+    border-color: #D9E0DE !important;
+    color: #1F2D2C !important;
+  }
+  html[data-theme="light"] .banner.info {
+    background: #EAF2F1 !important;
+    border-color: #B7CDC9 !important;
+    color: #1F2D2C !important;
+  }
+  html[data-theme="light"] .banner {
+    background: #FCE9E4;
+    border-color: #E9866F;
+    color: #6C2318;
+  }
   .output.placeholder { color: #4E706C; display: flex; align-items: center; }
   .bridge { display: flex; gap: 5px; margin: 10px 0; height: 14px; align-items: center; }
   .bridge-line { width: 28px; height: 1px; background: #2B5350; }
