@@ -351,10 +351,10 @@
       </div>
     </div>
     <div style="display:flex; gap:8px; margin-top:12px; flex-wrap:wrap;">
-      <button class="btn btn-primary" id="liveCamSnap" style="flex:1 1 40%;">📸 صور دلوقتي</button>
-      <button class="btn btn-ghost" id="liveCamAutoToggle" style="flex:1 1 40%; background:#12302E; border:1px solid #204442;">▶ ابدأ تلقائي</button>
-      <button class="btn btn-ghost" id="liveCamOverlayToggle" style="flex:1 1 45%; background:#12302E; border:1px solid #204442;">🎯 Overlay: تشغيل</button>
-      <button class="btn btn-ghost" id="liveCamSwitch" style="flex:1 1 45%; background:#12302E; border:1px solid #204442;">🔄 كاميرا</button>
+      <button class="btn btn-primary" id="liveCamAutoToggle" style="flex:1 1 100%; padding:14px; font-size:15px; font-weight:700;">⏸ إيقاف مؤقت</button>
+      <button class="btn btn-ghost" id="liveCamSnap" style="flex:1 1 30%; background:#12302E; border:1px solid #204442;">📸 حدّث</button>
+      <button class="btn btn-ghost" id="liveCamOverlayToggle" style="flex:1 1 30%; background:#12302E; border:1px solid #204442;">🎯 Overlay</button>
+      <button class="btn btn-ghost" id="liveCamSwitch" style="flex:1 1 30%; background:#12302E; border:1px solid #204442;">🔄 كاميرا</button>
     </div>
   </div>
 </div>
@@ -1643,17 +1643,33 @@ async function ensureLiveWorker() {
   return liveTesseractWorker;
 }
 
+function waitForVideoReady(v) {
+  // videoWidth becomes > 0 only after the first frame is decoded.
+  return new Promise((resolve) => {
+    if (v.videoWidth > 0) return resolve();
+    let done = false;
+    const finish = () => { if (done) return; done = true; v.removeEventListener("loadeddata", finish); v.removeEventListener("playing", finish); resolve(); };
+    v.addEventListener("loadeddata", finish, { once: true });
+    v.addEventListener("playing", finish, { once: true });
+    setTimeout(finish, 3000); // safety fallback
+  });
+}
+
 async function startLiveStream() {
   stopLiveStream(); // just in case
   try {
+    setLiveStatus("بيفتح الكاميرا...");
     liveStream = await navigator.mediaDevices.getUserMedia({
       video: { facingMode: { ideal: liveFacing } }, audio: false
     });
     liveCamVideo.srcObject = liveStream;
     await liveCamVideo.play().catch(() => {});
-    setLiveStatus("جاهز — وجّه الكاميرا على النص");
+    await waitForVideoReady(liveCamVideo);
+    setLiveStatus("جاهز — بيقرا وبيترجم كل ثانيتين");
+    return true;
   } catch (err) {
     setLiveStatus("مفيش صلاحية للكاميرا: " + (err.message || err.name));
+    return false;
   }
 }
 
@@ -1879,20 +1895,26 @@ async function scanFrameOnce({ forceTranslate = false } = {}) {
   }
 }
 
+const LIVE_SCAN_INTERVAL_MS = 2000; // how often to scan when auto mode is running
 function toggleLiveAuto(force) {
   const shouldStart = typeof force === "boolean" ? force : !liveAutoTimer;
   if (shouldStart) {
-    liveAutoBtn.textContent = "⏸ وقّف التلقائي";
-    liveAutoBtn.style.background = "#E8A33D";
-    liveAutoBtn.style.color = "#0D1F1E";
-    // First pass immediately, then every 3500ms
+    // "Running" state: primary orange, tap to pause.
+    liveAutoBtn.textContent = "⏸ إيقاف مؤقت";
+    liveAutoBtn.classList.remove("btn-ghost");
+    liveAutoBtn.classList.add("btn-primary");
+    liveAutoBtn.style.background = "";
+    liveAutoBtn.style.color = "";
     scanFrameOnce({ forceTranslate: false });
-    liveAutoTimer = setInterval(() => scanFrameOnce({ forceTranslate: false }), 3500);
+    liveAutoTimer = setInterval(() => scanFrameOnce({ forceTranslate: false }), LIVE_SCAN_INTERVAL_MS);
   } else {
+    // "Paused" state: ghost style, tap to resume.
     if (liveAutoTimer) clearInterval(liveAutoTimer);
     liveAutoTimer = null;
-    liveAutoBtn.textContent = "▶ ابدأ تلقائي";
-    liveAutoBtn.style.background = "";
+    liveAutoBtn.textContent = "▶ كمّل الترجمة";
+    liveAutoBtn.classList.remove("btn-primary");
+    liveAutoBtn.classList.add("btn-ghost");
+    liveAutoBtn.style.background = "#12302E";
     liveAutoBtn.style.color = "";
   }
 }
@@ -1906,7 +1928,12 @@ async function openLiveCam() {
   liveOcrLangCode = liveOcrLangCode || fromLang;
   if (liveCamOcrLangSelect) liveCamOcrLangSelect.value = liveOcrLangCode;
   liveCamBackdrop.classList.add("open");
-  await startLiveStream();
+  const ok = await startLiveStream();
+  // Kick off continuous auto-scan immediately so the user just points and reads,
+  // no button press required. Only if the stream came up cleanly.
+  if (ok && !liveAutoTimer) {
+    toggleLiveAuto(true);
+  }
 }
 
 function closeLiveCam() {
