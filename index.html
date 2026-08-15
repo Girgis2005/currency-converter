@@ -99,10 +99,80 @@
   .icon-btn:disabled { color: #3E5C59; cursor: default; }
   .icon-btn.active { background: #E8A33D; color: #0D1F1E; }
   textarea, .output {
-    width: 100%; min-height: 90px; background: transparent; border: none;
-    color: #F2EDE4; font-size: 17px; line-height: 1.5; resize: none; padding: 0;
+    width: 100%; min-height: 160px; background: transparent; border: none;
+    color: #F2EDE4; font-size: 18px; line-height: 1.55; resize: none; padding: 0;
     font-family: inherit;
   }
+  #outputText { min-height: 160px; }
+  #sourceText { min-height: 160px; }
+
+  /* --- Tabs (view switcher) --- */
+  .tab-strip {
+    display: flex; gap: 6px; background: #12302E; border: 1px solid #204442;
+    border-radius: 999px; padding: 4px; margin-bottom: 14px;
+  }
+  .tab {
+    flex: 1; padding: 10px 14px; border: none; border-radius: 999px;
+    background: transparent; color: #8FADA9; font-family: 'Tajawal', sans-serif;
+    font-size: 14px; font-weight: 600; cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+  }
+  .tab.active { background: #E8A33D; color: #0D1F1E; }
+  .view { display: none; }
+  .view.active { display: block; }
+
+  /* --- Small utility footer (moved out of the main flow so it's not loud) --- */
+  .utility-row {
+    display: flex; gap: 6px; margin-top: 16px; flex-wrap: wrap;
+    justify-content: center;
+  }
+  .util-btn {
+    background: transparent; border: 1px solid #204442; color: #8FADA9;
+    border-radius: 999px; padding: 8px 14px; font-size: 12px; cursor: pointer;
+    font-family: 'Space Grotesk', sans-serif; display: inline-flex; align-items: center; gap: 5px;
+  }
+  .util-btn:hover, .util-btn:active { border-color: #E8A33D; color: #E8A33D; }
+
+  /* --- Conversation view specifics --- */
+  .convo-hero {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    padding: 20px 12px; background: #12302E; border: 1px solid #204442;
+    border-radius: 16px; margin-bottom: 14px;
+  }
+  .convo-mic-big {
+    width: 96px; height: 96px; border-radius: 50%; border: none;
+    background: #E8A33D; color: #0D1F1E; font-size: 42px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    margin-bottom: 14px; box-shadow: 0 4px 20px rgba(232, 163, 61, 0.25);
+    transition: transform 0.1s;
+  }
+  .convo-mic-big:active { transform: scale(0.96); }
+  .convo-mic-big.on { background: #FF6F59; animation: pulse-ring 1.4s infinite; }
+  .convo-title { font-family: 'Tajawal', sans-serif; font-size: 20px; font-weight: 700; margin: 0 0 4px; }
+  .convo-hint { font-size: 13px; color: #8FADA9; text-align: center; margin: 0 0 8px; }
+  .convo-transcript {
+    background: #12302E; border: 1px solid #204442; border-radius: 16px;
+    padding: 12px; max-height: 50vh; overflow-y: auto;
+  }
+  .convo-empty { text-align: center; color: #6B8A87; padding: 30px 10px; font-size: 13px; }
+  .turn {
+    display: flex; flex-direction: column; gap: 4px; padding: 10px 12px;
+    border-radius: 12px; margin-bottom: 8px;
+  }
+  .turn.side-from { background: #17322F; align-self: flex-start; margin-right: 30px; }
+  .turn.side-to { background: #1F4744; align-self: flex-end; margin-left: 30px; }
+  .turn-lang { font-family: 'JetBrains Mono', monospace; font-size: 10px; color: #6B8A87; letter-spacing: 1px; text-transform: uppercase; }
+  .turn-source { font-size: 15px; color: #F2EDE4; }
+  .turn-trans { font-size: 14px; color: #E8A33D; }
+  html[data-theme="light"] .tab-strip { background: #FFFFFF; border-color: #D9E0DE; }
+  html[data-theme="light"] .tab { color: #5A6B69; }
+  html[data-theme="light"] .util-btn { border-color: #D9E0DE; color: #5A6B69; }
+  html[data-theme="light"] .convo-hero,
+  html[data-theme="light"] .convo-transcript { background: #FFFFFF; border-color: #D9E0DE; }
+  html[data-theme="light"] .convo-hint { color: #7A8987; }
+  html[data-theme="light"] .turn.side-from { background: #EAF2F1; }
+  html[data-theme="light"] .turn.side-to { background: #EFE6D3; }
+  html[data-theme="light"] .turn-source { color: #1F2D2C; }
   .char-count {
     font-family: 'JetBrains Mono', monospace;
     font-size: 10px; color: #4E706C; text-align: end; margin-top: 4px;
@@ -208,56 +278,74 @@
   <select id="toLang"></select>
 </div>
 
-<div class="wrap" style="margin-bottom:14px;">
-  <button id="continuousBtn" style="width:100%; background:#12302E; border:1px solid #204442; color:#8FADA9; border-radius:10px; padding:10px; font-size:13px; font-family:'Space Grotesk',sans-serif; display:flex; align-items:center; justify-content:center; gap:8px; cursor:pointer;">
-    <span id="continuousDot" style="width:8px; height:8px; border-radius:50%; background:#4E706C; flex-shrink:0;"></span>
-    <span id="convoLabel">محادثة تلقائية: متوقفة</span>
-  </button>
+<!-- Tab strip: switches the main pane between Translation and Auto-Conversation -->
+<div class="wrap tab-strip" role="tablist">
+  <button class="tab active" data-view="translate" role="tab">📝 ترجمة</button>
+  <button class="tab" data-view="convo" role="tab">🗣 محادثة تلقائية</button>
 </div>
 
-<div class="wrap card">
-  <div class="card-header">
-    <span class="card-label" id="fromLabel"></span>
-    <div style="display:flex; gap:8px;">
-      <button class="icon-btn" id="copyFromBtn" aria-label="انسخ النص">📋</button>
-      <button class="icon-btn" id="speakFromBtn" disabled aria-label="اسمع النص">🔊</button>
-      <button class="icon-btn" id="micFromBtn" aria-label="سجل صوت">🎙</button>
+<!-- =============== VIEW: TRANSLATION =============== -->
+<div class="wrap view active" id="viewTranslate">
+  <div class="card">
+    <div class="card-header">
+      <span class="card-label" id="fromLabel"></span>
+      <div style="display:flex; gap:8px;">
+        <button class="icon-btn" id="copyFromBtn" aria-label="انسخ النص">📋</button>
+        <button class="icon-btn" id="speakFromBtn" disabled aria-label="اسمع النص">🔊</button>
+        <button class="icon-btn" id="micFromBtn" aria-label="سجل صوت">🎙</button>
+      </div>
     </div>
+    <textarea id="sourceText" placeholder="اكتب أو دوس المايك واتكلم..."></textarea>
+    <div class="char-count" id="sourceCharCount">0</div>
   </div>
-  <textarea id="sourceText" placeholder="اكتب أو دوس المايك واتكلم..."></textarea>
-  <div class="char-count" id="sourceCharCount">0</div>
-</div>
 
-<div class="wrap bridge" id="bridge">
-  <div class="bridge-line"></div>
-</div>
+  <div class="bridge" id="bridge"><div class="bridge-line"></div></div>
 
-<div class="wrap card">
-  <div class="card-header">
-    <span class="card-label" id="toLabel"></span>
-    <div style="display:flex; gap:8px;">
-      <button class="icon-btn" id="favBtn" disabled aria-label="أضف للمفضلة">☆</button>
-      <button class="icon-btn" id="shareBtn" disabled aria-label="شارك الترجمة">📤</button>
-      <button class="icon-btn" id="micToBtn" aria-label="سجل صوت">🎙</button>
-      <button class="icon-btn" id="speakToBtn" disabled aria-label="اسمع الترجمة">🔊</button>
-      <button class="icon-btn" id="copyToBtn" aria-label="انسخ الترجمة">📋</button>
+  <div class="card">
+    <div class="card-header">
+      <span class="card-label" id="toLabel"></span>
+      <div style="display:flex; gap:8px;">
+        <button class="icon-btn" id="favBtn" disabled aria-label="أضف للمفضلة">☆</button>
+        <button class="icon-btn" id="shareBtn" disabled aria-label="شارك الترجمة">📤</button>
+        <button class="icon-btn" id="micToBtn" aria-label="سجل صوت">🎙</button>
+        <button class="icon-btn" id="speakToBtn" disabled aria-label="اسمع الترجمة">🔊</button>
+        <button class="icon-btn" id="copyToBtn" aria-label="انسخ الترجمة">📋</button>
+      </div>
     </div>
+    <textarea id="outputText" placeholder="هتظهر الترجمة هنا... أو اكتب هنا وهاتترجم للأعلى"></textarea>
+    <div class="char-count" id="outputCharCount">0</div>
   </div>
-  <textarea id="outputText" placeholder="هتظهر الترجمة هنا... أو اكتب هنا وهاتترجم للأعلى"></textarea>
-  <div class="char-count" id="outputCharCount">0</div>
 </div>
 
-<div class="wrap" style="display:flex; gap:8px; margin-top:14px; flex-wrap:wrap;">
-  <button class="btn btn-ghost" id="imageBtn" style="flex:1 1 45%; background:#12302E; border:1px solid #204442; display:flex; align-items:center; justify-content:center; gap:6px;">📷 صورة</button>
-  <button class="btn btn-ghost" id="cameraBtn" style="flex:1 1 45%; background:#12302E; border:1px solid #204442; display:flex; align-items:center; justify-content:center; gap:6px;">📸 كاميرا</button>
-  <button class="btn btn-ghost" id="phrasesBtn" style="flex:1 1 45%; background:#12302E; border:1px solid #204442; display:flex; align-items:center; justify-content:center; gap:6px;">💬 عبارات</button>
-  <button class="btn btn-ghost" id="favoritesBtn" style="flex:1 1 45%; background:#12302E; border:1px solid #204442; display:flex; align-items:center; justify-content:center; gap:6px;">⭐ المفضلة</button>
-  <button class="btn btn-ghost" id="historyBtn" style="flex:1 1 100%; background:#12302E; border:1px solid #204442; display:flex; align-items:center; justify-content:center; gap:6px;">🕘 السجل</button>
+<!-- =============== VIEW: CONVERSATION =============== -->
+<div class="wrap view" id="viewConvo">
+  <div class="convo-hero">
+    <button class="convo-mic-big" id="convoMicBig" aria-label="ابدأ محادثة تلقائية">🎙</button>
+    <h3 class="convo-title" id="convoTitle">اضغط عشان تبدأ</h3>
+    <p class="convo-hint" id="convoHint">التطبيق هيسمع الاتنين ويترجم بينهم تلقائي</p>
+  </div>
+
+  <div class="convo-transcript" id="convoTranscript">
+    <div class="convo-empty">لسه ما اتحدثتش. اضغط الميكروفون فوق وابدأ.</div>
+  </div>
+</div>
+
+<!-- Compact utility row (visible on all views) -->
+<div class="wrap utility-row">
+  <button class="util-btn" id="phrasesBtn">💬 عبارات جاهزة</button>
+  <button class="util-btn" id="favoritesBtn">⭐ المفضلة</button>
+  <button class="util-btn" id="historyBtn">🕘 السجل</button>
+  <button class="util-btn" id="imageBtn">📷 صورة</button>
+  <button class="util-btn" id="cameraBtn">📸 كاميرا</button>
 </div>
 <input type="file" id="imageInput" accept="image/*" style="display:none;" />
 <input type="file" id="cameraInput" accept="image/*" capture="environment" style="display:none;" />
 
-<p class="footnote">وضع محادثة: كل واحد يدوس المايك اللي جنبه ويتكلم بلغته — التسجيل الصوتي وقراءة النص شغالين أحسن على Chrome</p>
+<!-- Kept invisible for backwards compat with old JS references; still used to drive convo state text -->
+<button id="continuousBtn" style="display:none;">
+  <span id="continuousDot"></span>
+  <span id="convoLabel">محادثة تلقائية: متوقفة</span>
+</button>
 
 <div class="modal-backdrop" id="modalBackdrop">
   <div class="modal">
@@ -995,6 +1083,16 @@ async function startConversationTurn() {
       if (listenerSide === "to") speakToBtn.disabled = !result; else speakFromBtn.disabled = !result;
       if (result) {
         saveHistory(langForSide(spokenSide), langForSide(listenerSide), finalTranscript, result);
+        // Log to the Conversation view's transcript
+        if (typeof pushTranscriptTurn === "function") {
+          pushTranscriptTurn({
+            side: spokenSide,
+            fromLang: langForSide(spokenSide),
+            toLang: langForSide(listenerSide),
+            source: finalTranscript,
+            translation: result,
+          });
+        }
         setConvoStatus("محادثة تلقائية: بتنطق...", "#E8A33D");
         await speak(listenerSide);
       }
@@ -2246,12 +2344,92 @@ window.addEventListener("appinstalled", () => {
   installBtn.style.display = "none";
 });
 
+// ============================================================
+// View switcher (tabs) — Translation <-> Auto-Conversation
+// The old top-of-page "continuousBtn" is now hidden; the big round mic in
+// the Conversation view is the only entry point users see. The two mirror
+// each other via the same start/stop functions.
+// ============================================================
+const tabs = document.querySelectorAll(".tab");
+const views = { translate: $("viewTranslate"), convo: $("viewConvo") };
+function switchView(name) {
+  tabs.forEach((t) => t.classList.toggle("active", t.dataset.view === name));
+  Object.entries(views).forEach(([k, el]) => el.classList.toggle("active", k === name));
+  // If leaving conversation, stop the mic so we don't burn battery
+  if (name !== "convo" && conversationActive) stopConversation();
+}
+tabs.forEach((t) => t.addEventListener("click", () => switchView(t.dataset.view)));
+
+// Big mic in the Conversation view mirrors the (now hidden) continuousBtn
+const convoMicBig = $("convoMicBig");
+const convoTitle = $("convoTitle");
+const convoHint = $("convoHint");
+const convoTranscript = $("convoTranscript");
+const convoTurns = []; // in-memory only, cleared on view switch
+
+function renderTranscript() {
+  if (!convoTurns.length) {
+    convoTranscript.innerHTML = `<div class="convo-empty">لسه ما اتحدثتش. اضغط الميكروفون فوق وابدأ.</div>`;
+    return;
+  }
+  convoTranscript.innerHTML = convoTurns.map((t) => `
+    <div class="turn side-${t.side}">
+      <div class="turn-lang">${LANGS[t.fromLang]?.label || t.fromLang} → ${LANGS[t.toLang]?.label || t.toLang}</div>
+      <div class="turn-source" dir="${LANGS[t.fromLang]?.dir || 'ltr'}">${t.source}</div>
+      <div class="turn-trans" dir="${LANGS[t.toLang]?.dir || 'ltr'}">${t.translation}</div>
+    </div>
+  `).join("");
+  convoTranscript.scrollTop = convoTranscript.scrollHeight;
+}
+function pushTranscriptTurn(entry) {
+  convoTurns.push(entry);
+  if (convoTurns.length > 40) convoTurns.shift();
+  renderTranscript();
+}
+
+// Big mic toggles conversation. Reuses the existing continuousBtn handler
+// logic by delegating to the same functions.
+convoMicBig.addEventListener("click", () => {
+  if (conversationActive) {
+    stopConversation();
+  } else {
+    conversationActive = true;
+    continuousBtn.style.borderColor = "#E8A33D";
+    startConversationTurn();
+  }
+});
+
+// Reflect convo state in the big mic look + title
+function updateConvoUI() {
+  if (conversationActive) {
+    convoMicBig.classList.add("on");
+    convoMicBig.textContent = "⏸";
+    convoTitle.textContent = "شغالة — اتكلموا";
+    convoHint.textContent = "التطبيق بيسمع، بيترجم، وبينطق";
+  } else {
+    convoMicBig.classList.remove("on");
+    convoMicBig.textContent = "🎙";
+    convoTitle.textContent = "اضغط عشان تبدأ";
+    convoHint.textContent = "التطبيق هيسمع الاتنين ويترجم بينهم تلقائي";
+  }
+}
+// Monkey-patch setConvoStatus so we also update the new UI without touching the old function
+const _origSetConvoStatus = setConvoStatus;
+setConvoStatus = function (text, color) {
+  _origSetConvoStatus(text, color);
+  updateConvoUI();
+  // While speaking, keep the hint text live-updating with the recognizer status
+  if (conversationActive) convoHint.textContent = text.replace(/^محادثة تلقائية:\s*/, "");
+};
+
 populateSelects();
 refreshLabels();
 updateCharCount();
 refreshFavStar();
+updateConvoUI();
+renderTranscript();
 if (!getApiKey()) {
-  showBanner('شغال دلوقتي بترجمة مجانية (أضعف في اللهجة المصرية) — لو عايز جودة Claude حط مفتاحك من ⚙', "info");
+  showBanner('شغال بالنظام المجاني (Google Translate + Chrome OCR للكاميرا). لو عايز لهجة مصرية دقيقة حط مفتاح Claude من ⚙', "info");
 }
 </script>
 </body>
