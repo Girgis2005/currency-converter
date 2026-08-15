@@ -243,7 +243,8 @@
       <button class="icon-btn" id="copyToBtn" aria-label="انسخ الترجمة">📋</button>
     </div>
   </div>
-  <div class="output placeholder" id="outputText">هتظهر الترجمة هنا</div>
+  <textarea id="outputText" placeholder="هتظهر الترجمة هنا... أو اكتب هنا وهاتترجم للأعلى"></textarea>
+  <div class="char-count" id="outputCharCount">0</div>
 </div>
 
 <div class="wrap" style="display:flex; gap:8px; margin-top:14px; flex-wrap:wrap;">
@@ -321,6 +322,28 @@
     <div class="modal-actions" style="margin-top:14px;">
       <button class="btn btn-ghost" id="favoritesClear">امسح المفضلة</button>
       <button class="btn btn-primary" id="favoritesClose">قفل</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="liveCamBackdrop">
+  <div class="modal" style="max-width:520px; padding:14px;">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+      <h2 style="margin:0;">كاميرا مباشرة</h2>
+      <button class="btn btn-ghost" id="liveCamClose" style="padding:4px 10px;">✕ قفل</button>
+    </div>
+    <p style="font-size:12px; margin:0 0 10px; color:#8FADA9;">وجّه الكاميرا على النص. الترجمة بتتحدّث كل شوية تلقائي.</p>
+    <div id="liveCamStage" style="position:relative; background:#000; border-radius:12px; overflow:hidden; aspect-ratio:3/4; max-height:60vh;">
+      <video id="liveCamVideo" playsinline muted autoplay style="width:100%; height:100%; object-fit:cover; background:#000;"></video>
+      <div id="liveCamOverlay" style="position:absolute; left:0; right:0; bottom:0; background:linear-gradient(transparent, rgba(0,0,0,0.85)); color:#fff; padding:16px 12px 12px; font-size:15px; min-height:80px; line-height:1.5;">
+        <div id="liveCamStatus" style="font-size:11px; opacity:0.7; margin-bottom:6px; font-family:'JetBrains Mono',monospace;">جاهز — وجّه الكاميرا على النص</div>
+        <div id="liveCamTranslation" style="font-weight:500;">—</div>
+      </div>
+    </div>
+    <div style="display:flex; gap:8px; margin-top:12px; flex-wrap:wrap;">
+      <button class="btn btn-primary" id="liveCamSnap" style="flex:1 1 40%;">📸 صور دلوقتي</button>
+      <button class="btn btn-ghost" id="liveCamAutoToggle" style="flex:1 1 40%; background:#12302E; border:1px solid #204442;">▶ ابدأ تلقائي</button>
+      <button class="btn btn-ghost" id="liveCamSwitch" style="flex:1 1 100%; background:#12302E; border:1px solid #204442;">🔄 كاميرا أمامية/خلفية</button>
     </div>
   </div>
 </div>
@@ -621,16 +644,11 @@ function setTranslating(state) {
 }
 
 function getBoxText(side) {
-  if (side === "from") return sourceText.value;
-  return outputText.classList.contains("placeholder") ? "" : outputText.textContent;
+  return side === "from" ? sourceText.value : outputText.value;
 }
 function setBoxText(side, text, isPlaceholder) {
-  if (side === "from") {
-    sourceText.value = text;
-  } else {
-    outputText.textContent = text;
-    outputText.classList.toggle("placeholder", !!isPlaceholder);
-  }
+  const el = side === "from" ? sourceText : outputText;
+  el.value = isPlaceholder ? "" : text;
 }
 function otherSide(side) {
   return side === "from" ? "to" : "from";
@@ -643,24 +661,31 @@ async function runTranslate(side, autoSpeak) {
   const from = side;
   const to = otherSide(side);
   const text = getBoxText(from);
-  if (!text.trim()) {
-    setBoxText(to, to === "to" ? "هتظهر الترجمة هنا" : "", true);
-    if (to === "to") speakToBtn.disabled = true; else speakFromBtn.disabled = true;
-    if (typeof refreshFavStar === "function") refreshFavStar();
-    return;
-  }
-  setTranslating(true);
+  programmaticEdit = true;
   try {
-    const result = await translateText(text, langForSide(from), langForSide(to));
-    setBoxText(to, result, !result);
-    if (to === "to") speakToBtn.disabled = !result; else speakFromBtn.disabled = !result;
-    if (result && autoSpeak) await speak(to);
-    if (result) saveHistory(langForSide(from), langForSide(to), text, result);
-  } catch (e) {
-    // banner already shown
+    if (!text.trim()) {
+      setBoxText(to, "", true);
+      if (to === "to") speakToBtn.disabled = true; else speakFromBtn.disabled = true;
+      if (typeof refreshFavStar === "function") refreshFavStar();
+      updateCharCount();
+      return;
+    }
+    setTranslating(true);
+    try {
+      const result = await translateText(text, langForSide(from), langForSide(to));
+      setBoxText(to, result, !result);
+      if (to === "to") speakToBtn.disabled = !result; else speakFromBtn.disabled = !result;
+      if (result && autoSpeak) await speak(to);
+      if (result) saveHistory(langForSide(from), langForSide(to), text, result);
+    } catch (e) {
+      // banner already shown
+    } finally {
+      setTranslating(false);
+      if (typeof refreshFavStar === "function") refreshFavStar();
+      updateCharCount();
+    }
   } finally {
-    setTranslating(false);
-    if (typeof refreshFavStar === "function") refreshFavStar();
+    programmaticEdit = false;
   }
 }
 
@@ -684,10 +709,9 @@ swapBtn.addEventListener("click", () => {
   fromLang = oldTo; toLang = oldFrom;
   fromSelect.value = fromLang; toSelect.value = toLang;
   const srcVal = sourceText.value;
-  const outVal = outputText.classList.contains("placeholder") ? "" : outputText.textContent;
+  const outVal = outputText.value;
   sourceText.value = outVal;
-  outputText.textContent = srcVal || "هتظهر الترجمة هنا";
-  outputText.classList.toggle("placeholder", !srcVal);
+  outputText.value = srcVal;
   speakToBtn.disabled = !srcVal;
   speakFromBtn.disabled = !outVal;
   refreshLabels();
@@ -824,6 +848,7 @@ function detectLangAmong(text, candidates) {
 function stopConversation() {
   conversationActive = false;
   conversationPaused = false;
+  convoExpectedLang = null;
   if (convoRecognition) {
     convoRecognition.onend = null;
     convoRecognition.onresult = null;
@@ -834,6 +859,11 @@ function stopConversation() {
   continuousBtn.style.borderColor = "#204442";
   setConvoStatus("محادثة تلقائية: متوقفة", "#4E706C");
 }
+
+// Which language should the NEXT convo turn listen for?
+// Alternates so a two-way chat works (Speaker A → recognize in A's lang,
+// translate to B; then Speaker B → recognize in B's lang, translate to A).
+let convoExpectedLang = null; // null means "same as fromLang"
 
 async function startConversationTurn() {
   if (!conversationActive) return;
@@ -854,11 +884,15 @@ async function startConversationTurn() {
   bannerHost.innerHTML = "";
 
   convoRecognition = new SR();
-  convoRecognition.lang = RECOGNITION_LANG[fromLang];
+  const listenLang = convoExpectedLang || fromLang;
+  convoRecognition.lang = RECOGNITION_LANG[listenLang];
   convoRecognition.interimResults = false;
   convoRecognition.continuous = false;
 
-  convoRecognition.onstart = () => setConvoStatus("محادثة تلقائية: بتسمع...", "#E8A33D");
+  convoRecognition.onstart = () => {
+    const listenerLabel = LANGS[listenLang]?.label || listenLang;
+    setConvoStatus(`محادثة تلقائية: بتسمع ${listenerLabel}...`, "#E8A33D");
+  };
 
   convoRecognition.onerror = (event) => {
     if (event.error === "not-allowed" || event.error === "service-not-allowed") {
@@ -883,23 +917,39 @@ async function startConversationTurn() {
     conversationPaused = true;
     setConvoStatus("محادثة تلقائية: بتترجم...", "#E8A33D");
 
-    const spokenLang = detectLangAmong(finalTranscript, [fromLang, toLang]);
+    // Trust the recognition language over content-based guessing: if we told
+    // the browser to listen for Portuguese and it returned text, treat it as
+    // Portuguese even if it looks Latin. Fall back to script/keyword detection
+    // for ambiguous cases.
+    const detected = detectLangAmong(finalTranscript, [fromLang, toLang]);
+    const spokenLang = detected === listenLang || /[؀-ۿ]/.test(finalTranscript)
+      ? detected
+      : listenLang;
     const spokenSide = spokenLang === toLang ? "to" : "from";
     const listenerSide = otherSide(spokenSide);
 
+    programmaticEdit = true;
     setBoxText(spokenSide, finalTranscript, false);
+    programmaticEdit = false;
     try {
       const result = await translateText(finalTranscript, langForSide(spokenSide), langForSide(listenerSide));
+      programmaticEdit = true;
       setBoxText(listenerSide, result, !result);
+      programmaticEdit = false;
       if (listenerSide === "to") speakToBtn.disabled = !result; else speakFromBtn.disabled = !result;
       if (result) {
         saveHistory(langForSide(spokenSide), langForSide(listenerSide), finalTranscript, result);
         setConvoStatus("محادثة تلقائية: بتنطق...", "#E8A33D");
         await speak(listenerSide);
       }
+      updateCharCount();
+      if (typeof refreshFavStar === "function") refreshFavStar();
     } catch (e) {
       // banner already shown by translateText
     }
+
+    // Next turn: expect the OTHER speaker
+    convoExpectedLang = spokenLang === fromLang ? toLang : fromLang;
 
     conversationPaused = false;
     if (conversationActive) startConversationTurn();
@@ -971,17 +1021,40 @@ function autoSwitchLangForSide(side, text) {
 
 const CHAR_WARN = 800;
 const sourceCharCount = $("sourceCharCount");
+const outputCharCount = $("outputCharCount");
 function updateCharCount() {
-  const n = sourceText.value.length;
-  sourceCharCount.textContent = String(n);
-  sourceCharCount.classList.toggle("warn", n > CHAR_WARN);
+  const sn = sourceText.value.length;
+  const on = outputText.value.length;
+  sourceCharCount.textContent = String(sn);
+  outputCharCount.textContent = String(on);
+  sourceCharCount.classList.toggle("warn", sn > CHAR_WARN);
+  outputCharCount.classList.toggle("warn", on > CHAR_WARN);
 }
+
+// Which side did the human last touch? Debounced translation reads from this side.
+let lastTypedSide = "from";
+let programmaticEdit = false;
 sourceText.addEventListener("input", () => {
+  if (programmaticEdit) return;
+  lastTypedSide = "from";
   updateCharCount();
   clearTimeout(debounceTimer);
   debounceTimer = setTimeout(() => {
     autoSwitchLangForSide("from", sourceText.value);
     runTranslate("from", false);
+  }, 600);
+});
+outputText.addEventListener("input", () => {
+  if (programmaticEdit) return;
+  lastTypedSide = "to";
+  updateCharCount();
+  clearTimeout(debounceTimer);
+  debounceTimer = setTimeout(() => {
+    // Deliberately no autoSwitch here — if the user chose to type in the
+    // "to" card, they meant the language currently in the "to" dropdown.
+    // Auto-switching here would silently swap sides and translate the wrong
+    // direction (bug seen in smoke test with unaccented Portuguese).
+    runTranslate("to", false);
   }, 600);
 });
 
@@ -1078,7 +1151,7 @@ function isFavorited(sourceStr, resultStr) {
 }
 function refreshFavStar() {
   const src = sourceText.value;
-  const out = outputText.classList.contains("placeholder") ? "" : outputText.textContent;
+  const out = outputText.value;
   if (!src.trim() || !out.trim()) {
     favBtn.disabled = true;
     favBtn.textContent = "☆";
@@ -1094,7 +1167,7 @@ function refreshFavStar() {
 }
 favBtn.addEventListener("click", () => {
   const src = sourceText.value;
-  const out = outputText.classList.contains("placeholder") ? "" : outputText.textContent;
+  const out = outputText.value;
   if (!src.trim() || !out.trim()) return;
   const list = loadFavorites();
   const existing = list.findIndex((f) => f.source === src && f.result === out);
@@ -1151,7 +1224,7 @@ $("favoritesClear").addEventListener("click", () => {
 // --- Share (Web Share API with clipboard fallback) ---
 shareBtn.addEventListener("click", async () => {
   const src = sourceText.value.trim();
-  const out = outputText.classList.contains("placeholder") ? "" : outputText.textContent.trim();
+  const out = outputText.value.trim();
   if (!src || !out) return;
   const shareText = `${src}\n\n→ ${out}\n\n— جسر Gesr`;
   if (navigator.share) {
@@ -1163,18 +1236,16 @@ shareBtn.addEventListener("click", async () => {
   }
 });
 
-// --- Camera capture (reuses the same file input flow as imageInput) ---
+// --- Camera capture (single snap) — opens the OS camera picker on mobile ---
 const cameraInput = $("cameraInput");
-$("cameraBtn").addEventListener("click", () => cameraInput.click());
-cameraInput.addEventListener("change", () => {
-  if (!cameraInput.files.length) return;
-  // Copy the picked file into imageInput so its existing handler runs unchanged
-  const dt = new DataTransfer();
-  dt.items.add(cameraInput.files[0]);
-  imageInput.files = dt.files;
-  imageInput.dispatchEvent(new Event("change"));
+cameraInput.addEventListener("change", async () => {
+  const file = cameraInput.files[0];
   cameraInput.value = "";
+  await processImageFile(file);
 });
+// The "📸 كاميرا" button opens the LIVE camera modal (Google-Translate-style)
+// which is set up below; the single-snap picker is still triggered by the
+// "Snap once" button inside that modal.
 
 // --- Export / Import (history + favorites bundle) ---
 $("exportBtn").addEventListener("click", () => {
@@ -1368,6 +1439,65 @@ imageBtn.addEventListener("click", () => imageInput.click());
 
 const OCR_LANG = { "ar-EG": "ara", "en-US": "eng", "pt-BR": "por" };
 
+// Shared: process a File/Blob through OCR + translate + preview modal
+async function processImageFile(file) {
+  if (!file) return;
+  lastImageFile = file;
+  lastImageResult = "";
+
+  const objectUrl = URL.createObjectURL(file);
+  imagePreview.src = objectUrl;
+  imagePreview.style.display = "block";
+  imageModalText.textContent = "بيحمّل محرك القراءة أول مرة (ممكن ياخد شوية وقت)...";
+  imageModalText.dir = "rtl";
+  imageSpinner.style.display = "inline-block";
+  imageDownloadRow.style.display = "none";
+  imageBackdrop.classList.add("open");
+
+  try {
+    const ocrLang = OCR_LANG[fromLang] || "eng";
+    const { data } = await Tesseract.recognize(file, ocrLang, {
+      logger: (m) => {
+        if (m.status === "recognizing text") {
+          imageModalText.textContent = `بيقرا النص... ${Math.round((m.progress || 0) * 100)}%`;
+        } else if (m.status) {
+          imageModalText.textContent = "بيحضّر محرك القراءة...";
+        }
+      },
+    });
+    const extractedText = (data?.text || "").trim();
+    if (!extractedText) {
+      imageSpinner.style.display = "none";
+      imageModalText.textContent = "مقدرتش ألاقي نص واضح في الصورة، جرب صورة أوضح أو أقرب";
+      return;
+    }
+    imageModalText.textContent = "بيترجم...";
+    const result = await translateText(extractedText, fromLang, toLang);
+    imageSpinner.style.display = "none";
+    if (!result) {
+      imageModalText.textContent = "قريت النص بس الترجمة فشلت، جرب تاني";
+      return;
+    }
+    imageModalText.textContent = result;
+    imageModalText.dir = LANGS[toLang].dir;
+    lastImageResult = result;
+    imageDownloadRow.style.display = "flex";
+    programmaticEdit = true;
+    setBoxText("from", extractedText, false);
+    setBoxText("to", result, false);
+    programmaticEdit = false;
+    speakToBtn.disabled = false;
+    speakFromBtn.disabled = false;
+    updateCharCount();
+    if (typeof refreshFavStar === "function") refreshFavStar();
+    saveHistory(fromLang, toLang, "📷 " + extractedText, result);
+  } catch (err) {
+    imageSpinner.style.display = "none";
+    imageModalText.textContent = "فشلت: " + (err && err.message ? err.message : String(err));
+    imageModalText.dir = "rtl";
+  }
+}
+
 function wrapCanvasText(ctx, text, maxWidth) {
   const words = text.split(" ");
   const lines = [];
@@ -1444,63 +1574,166 @@ $("downloadImageBtn").addEventListener("click", () => {
 imageInput.addEventListener("change", async () => {
   const file = imageInput.files[0];
   imageInput.value = ""; // allow re-selecting the same file later
-  if (!file) return;
-  lastImageFile = file;
-  lastImageResult = "";
-
-  const objectUrl = URL.createObjectURL(file);
-  imagePreview.src = objectUrl;
-  imagePreview.style.display = "block";
-  imageModalText.textContent = "بيحمّل محرك القراءة أول مرة (ممكن ياخد شوية وقت)...";
-  imageModalText.dir = "rtl";
-  imageSpinner.style.display = "inline-block";
-  imageDownloadRow.style.display = "none";
-  imageBackdrop.classList.add("open");
-
-  try {
-    const ocrLang = OCR_LANG[fromLang] || "eng";
-    const { data } = await Tesseract.recognize(file, ocrLang, {
-      logger: (m) => {
-        if (m.status === "recognizing text") {
-          imageModalText.textContent = `بيقرا النص... ${Math.round((m.progress || 0) * 100)}%`;
-        } else if (m.status) {
-          imageModalText.textContent = "بيحضّر محرك القراءة...";
-        }
-      },
-    });
-    const extractedText = (data?.text || "").trim();
-
-    if (!extractedText) {
-      imageSpinner.style.display = "none";
-      imageModalText.textContent = "مقدرتش ألاقي نص واضح في الصورة، جرب صورة أوضح أو أقرب";
-      return;
-    }
-
-    imageModalText.textContent = "بيترجم...";
-    const result = await translateText(extractedText, fromLang, toLang);
-
-    imageSpinner.style.display = "none";
-    if (!result) {
-      imageModalText.textContent = "قريت النص بس الترجمة فشلت، جرب تاني";
-      return;
-    }
-    imageModalText.textContent = result;
-    imageModalText.dir = LANGS[toLang].dir;
-    lastImageResult = result;
-    imageDownloadRow.style.display = "flex";
-    setBoxText("from", extractedText, false);
-    setBoxText("to", result, false);
-    speakToBtn.disabled = false;
-    speakFromBtn.disabled = false;
-    saveHistory(fromLang, toLang, "📷 " + extractedText, result);
-  } catch (err) {
-    imageSpinner.style.display = "none";
-    imageModalText.textContent = "فشلت: " + (err && err.message ? err.message : String(err));
-    imageModalText.dir = "rtl";
-  }
+  await processImageFile(file);
 });
 $("imageModalClose").addEventListener("click", () => imageBackdrop.classList.remove("open"));
 imageBackdrop.addEventListener("click", (e) => { if (e.target === imageBackdrop) imageBackdrop.classList.remove("open"); });
+
+// ============================================================
+// Live Camera mode (Google-Translate-style)
+//   - opens a video preview
+//   - user can "Snap" a single frame OR toggle auto-scan (OCR + translate every ~3.5s)
+//   - continuous mode skips re-OCR when the frame text hasn't changed noticeably
+//   - clean media stream shutdown on close
+// ============================================================
+const liveCamBackdrop = $("liveCamBackdrop");
+const liveCamVideo = $("liveCamVideo");
+const liveCamStatus = $("liveCamStatus");
+const liveCamTranslation = $("liveCamTranslation");
+const liveCamSnapBtn = $("liveCamSnap");
+const liveCamAutoBtn = $("liveCamAutoToggle");
+const liveCamSwitchBtn = $("liveCamSwitch");
+const liveCamCloseBtn = $("liveCamClose");
+
+let liveStream = null;
+let liveFacing = "environment";
+let liveAutoTimer = null;
+let liveBusy = false;
+let liveLastOcrText = "";
+let liveTesseractWorker = null;
+
+function setLiveStatus(msg) { liveCamStatus.textContent = msg; }
+
+async function ensureLiveWorker() {
+  if (liveTesseractWorker) return liveTesseractWorker;
+  const ocrLang = OCR_LANG[fromLang] || "eng";
+  setLiveStatus("بيحمّل محرك القراءة...");
+  liveTesseractWorker = await Tesseract.createWorker(ocrLang);
+  return liveTesseractWorker;
+}
+
+async function startLiveStream() {
+  stopLiveStream(); // just in case
+  try {
+    liveStream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: { ideal: liveFacing } }, audio: false
+    });
+    liveCamVideo.srcObject = liveStream;
+    await liveCamVideo.play().catch(() => {});
+    setLiveStatus("جاهز — وجّه الكاميرا على النص");
+  } catch (err) {
+    setLiveStatus("مفيش صلاحية للكاميرا: " + (err.message || err.name));
+  }
+}
+
+function stopLiveStream() {
+  if (liveStream) {
+    liveStream.getTracks().forEach((t) => t.stop());
+    liveStream = null;
+  }
+  liveCamVideo.srcObject = null;
+}
+
+function captureFrameToBlob() {
+  return new Promise((resolve) => {
+    if (!liveCamVideo.videoWidth) return resolve(null);
+    const canvas = document.createElement("canvas");
+    // Downscale to reduce OCR cost while keeping text legible
+    const maxW = 1024;
+    const scale = Math.min(1, maxW / liveCamVideo.videoWidth);
+    canvas.width = Math.round(liveCamVideo.videoWidth * scale);
+    canvas.height = Math.round(liveCamVideo.videoHeight * scale);
+    const ctx = canvas.getContext("2d");
+    ctx.drawImage(liveCamVideo, 0, 0, canvas.width, canvas.height);
+    canvas.toBlob(resolve, "image/jpeg", 0.85);
+  });
+}
+
+// Rough "did the scene change?" check based on text similarity
+function textIsSimilar(a, b) {
+  if (!a || !b) return false;
+  const norm = (s) => s.replace(/\s+/g, " ").trim().toLowerCase();
+  const A = norm(a), B = norm(b);
+  if (A === B) return true;
+  const shorter = A.length < B.length ? A : B;
+  const longer = A.length < B.length ? B : A;
+  if (!shorter) return false;
+  return longer.includes(shorter);
+}
+
+async function scanFrameOnce({ forceTranslate = false } = {}) {
+  if (liveBusy) return;
+  liveBusy = true;
+  try {
+    setLiveStatus("بيصور و بيقرا...");
+    const blob = await captureFrameToBlob();
+    if (!blob) { setLiveStatus("الفيديو لسه ما جهزش"); return; }
+
+    const worker = await ensureLiveWorker();
+    const { data } = await worker.recognize(blob);
+    const extracted = (data?.text || "").trim();
+    if (!extracted) { setLiveStatus("مفيش نص واضح — قرّب أو ثبّت الكاميرا"); return; }
+
+    if (!forceTranslate && textIsSimilar(extracted, liveLastOcrText)) {
+      setLiveStatus("نفس النص — مش هترجم تاني");
+      return;
+    }
+    liveLastOcrText = extracted;
+
+    setLiveStatus("بيترجم...");
+    const result = await translateText(extracted, fromLang, toLang);
+    if (!result) { setLiveStatus("الترجمة فشلت"); return; }
+    liveCamTranslation.textContent = result;
+    liveCamTranslation.dir = LANGS[toLang].dir;
+    setLiveStatus(`✓ ${extracted.slice(0, 60)}${extracted.length > 60 ? "..." : ""}`);
+    saveHistory(fromLang, toLang, "📸 " + extracted, result);
+  } catch (e) {
+    setLiveStatus("مشكلة: " + (e.message || e));
+  } finally {
+    liveBusy = false;
+  }
+}
+
+function toggleLiveAuto(force) {
+  const shouldStart = typeof force === "boolean" ? force : !liveAutoTimer;
+  if (shouldStart) {
+    liveAutoBtn.textContent = "⏸ وقّف التلقائي";
+    liveAutoBtn.style.background = "#E8A33D";
+    liveAutoBtn.style.color = "#0D1F1E";
+    // First pass immediately, then every 3500ms
+    scanFrameOnce({ forceTranslate: false });
+    liveAutoTimer = setInterval(() => scanFrameOnce({ forceTranslate: false }), 3500);
+  } else {
+    if (liveAutoTimer) clearInterval(liveAutoTimer);
+    liveAutoTimer = null;
+    liveAutoBtn.textContent = "▶ ابدأ تلقائي";
+    liveAutoBtn.style.background = "";
+    liveAutoBtn.style.color = "";
+  }
+}
+
+async function openLiveCam() {
+  liveCamTranslation.textContent = "—";
+  liveLastOcrText = "";
+  liveCamBackdrop.classList.add("open");
+  await startLiveStream();
+}
+
+function closeLiveCam() {
+  toggleLiveAuto(false);
+  stopLiveStream();
+  liveCamBackdrop.classList.remove("open");
+}
+
+$("cameraBtn").addEventListener("click", openLiveCam);
+liveCamCloseBtn.addEventListener("click", closeLiveCam);
+liveCamBackdrop.addEventListener("click", (e) => { if (e.target === liveCamBackdrop) closeLiveCam(); });
+liveCamSnapBtn.addEventListener("click", () => scanFrameOnce({ forceTranslate: true }));
+liveCamAutoBtn.addEventListener("click", () => toggleLiveAuto());
+liveCamSwitchBtn.addEventListener("click", async () => {
+  liveFacing = liveFacing === "environment" ? "user" : "environment";
+  await startLiveStream();
+});
 
 // --- Init ---
 if ("serviceWorker" in navigator) {
