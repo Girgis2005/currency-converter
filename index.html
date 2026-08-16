@@ -918,8 +918,21 @@ async function requestMicAccess() {
     return false;
   }
   try {
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    stream.getTracks().forEach((t) => t.stop()); // we only needed the permission prompt
+    // Request the mic with browser-side voice processing enabled so quiet
+    // speech gets amplified (autoGainControl) and background hiss suppressed.
+    // Note: Web Speech Recognition uses its own audio path and does NOT
+    // consume the stream we return here — but on many browsers this call
+    // still primes the OS/browser audio config for the subsequent
+    // recognition session, and it's the standard cue for a permission
+    // prompt anyway.
+    const stream = await navigator.mediaDevices.getUserMedia({
+      audio: {
+        echoCancellation: true,
+        noiseSuppression: true,
+        autoGainControl: true,
+      },
+    });
+    stream.getTracks().forEach((t) => t.stop());
     return true;
   } catch (err) {
     if (err.name === "NotAllowedError" || err.name === "SecurityError") {
@@ -2494,6 +2507,9 @@ let pttRecognition = null;
 let pttActiveSide = null;
 let pttFinalTranscript = "";
 let pttInterim = "";
+let pttConsumedResultCount = 0; // how many results (any kind) we've already read text from
+let pttEnded = false;           // guards the onend logic from firing twice
+let pttSuppressUntil = 0;       // ignore duplicate start/end events within this window (mobile fires touch+mouse)
 
 function refreshPttLabels() {
   pttFromLangLabel.textContent = LANGS[fromLang]?.label || fromLang;
@@ -2503,6 +2519,8 @@ function refreshPttLabels() {
 function setPttStatus(msg) { pttStatus.textContent = msg; }
 
 async function pttStart(side) {
+  const now = Date.now();
+  if (now < pttSuppressUntil) return; // dedupe touch+mouse double-fire
   if (pttRecognition) return; // already recording
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
   if (!SR) { setPttStatus("المتصفح ده مش بيدعم التسجيل الصوتي — جرّب Chrome"); return; }
@@ -2515,6 +2533,8 @@ async function pttStart(side) {
   pttActiveSide = side;
   pttFinalTranscript = "";
   pttInterim = "";
+  pttConsumedResultCount = 0;
+  pttEnded = false;
 
   pttRecognition = new SR();
   pttRecognition.lang = RECOGNITION_LANG[langForSide(side)];
@@ -2527,24 +2547,32 @@ async function pttStart(side) {
     else setPttStatus("خطأ: " + e.error);
   };
   pttRecognition.onresult = (event) => {
+    // Only look at results we haven't already consumed. Some browsers replay
+    // the same final result across events (that's what caused doubled speech).
     let interim = "";
-    for (let i = event.resultIndex; i < event.results.length; i++) {
+    for (let i = pttConsumedResultCount; i < event.results.length; i++) {
       const r = event.results[i];
-      if (r.isFinal) pttFinalTranscript += (pttFinalTranscript ? " " : "") + r[0].transcript.trim();
-      else interim += r[0].transcript;
+      if (r.isFinal) {
+        const chunk = r[0].transcript.trim();
+        if (chunk) pttFinalTranscript += (pttFinalTranscript ? " " : "") + chunk;
+        pttConsumedResultCount = i + 1;
+      } else {
+        interim += r[0].transcript;
+      }
     }
     pttInterim = interim.trim();
     const shown = (pttFinalTranscript + " " + pttInterim).trim();
     if (shown) setPttStatus(`"${shown.slice(0, 60)}"`);
   };
   pttRecognition.onend = async () => {
+    if (pttEnded) return; // guard: onend can fire twice on some browsers
+    pttEnded = true;
     const spokenSide = pttActiveSide;
-    const rec = pttRecognition;
     pttRecognition = null;
     pttActiveSide = null;
     pttFromBtn.classList.remove("pressing");
     pttToBtn.classList.remove("pressing");
-    const transcript = (pttFinalTranscript || pttInterim).trim();
+    const transcript = dedupeAdjacentWords((pttFinalTranscript || pttInterim).trim());
     if (!transcript) { setPttStatus("مسمعتش صوت — اضغط ودوس واتكلم"); return; }
     // Translate to the OTHER side and speak it
     const listenerSide = otherSide(spokenSide);
@@ -2578,21 +2606,33 @@ async function pttStart(side) {
   try { pttRecognition.start(); } catch (e) { setPttStatus("مقدرش يبدأ: " + e.message); }
 }
 
+// Collapse "hello hello world" -> "hello world" for stretches of repeated words
+// that some browsers emit when the same audio is finalized more than once.
+function dedupeAdjacentWords(text) {
+  return text.split(/\s+/).filter((w, i, arr) => i === 0 || w.toLowerCase() !== arr[i - 1].toLowerCase()).join(" ");
+}
+
 function pttStop() {
+  const now = Date.now();
+  if (now < pttSuppressUntil) return;
+  pttSuppressUntil = now + 300; // absorb the twin mouse event from a touch release
   if (!pttRecognition) return;
   try { pttRecognition.stop(); } catch {}
   // onend will handle the rest
 }
 
 function bindPtt(btn, side) {
-  const start = (e) => { e.preventDefault(); pttStart(side); };
-  const end = (e) => { e.preventDefault(); pttStop(); };
+  // On touch devices the browser fires touchend AND a synthetic mouseup.
+  // Handle only ONE per interaction (touch wins on touch devices, mouse
+  // on desktop) — pttSuppressUntil covers the race.
+  const start = (e) => { e.preventDefault(); e.stopPropagation(); pttStart(side); };
+  const end = (e) => { e.preventDefault(); e.stopPropagation(); pttStop(); };
   btn.addEventListener("touchstart", start, { passive: false });
   btn.addEventListener("touchend", end, { passive: false });
   btn.addEventListener("touchcancel", end);
   btn.addEventListener("mousedown", start);
   btn.addEventListener("mouseup", end);
-  btn.addEventListener("mouseleave", end);
+  btn.addEventListener("mouseleave", (e) => { if (pttRecognition && pttActiveSide === side) pttStop(); });
 }
 bindPtt(pttFromBtn, "from");
 bindPtt(pttToBtn, "to");
