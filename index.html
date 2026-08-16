@@ -134,25 +134,55 @@
   .util-btn:hover, .util-btn:active { border-color: #E8A33D; color: #E8A33D; }
 
   /* --- Conversation view specifics --- */
-  .convo-hero {
-    display: flex; flex-direction: column; align-items: center; justify-content: center;
-    padding: 20px 12px; background: #12302E; border: 1px solid #204442;
-    border-radius: 16px; margin-bottom: 14px;
+  .convo-mode-strip {
+    display: flex; gap: 4px; background: #12302E; border: 1px solid #204442;
+    border-radius: 999px; padding: 3px; margin-bottom: 10px;
+  }
+  .convo-mode-btn {
+    flex: 1; padding: 6px 10px; border: none; border-radius: 999px;
+    background: transparent; color: #8FADA9; font-family: 'Tajawal', sans-serif;
+    font-size: 12px; font-weight: 600; cursor: pointer;
+  }
+  .convo-mode-btn.active { background: #E8A33D; color: #0D1F1E; }
+  .convo-panel { background: #12302E; border: 1px solid #204442; border-radius: 14px; padding: 10px 10px 8px; margin-bottom: 10px; }
+  .convo-status-line { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #8FADA9; text-align: center; margin-top: 6px; min-height: 16px; }
+
+  /* Push-to-talk pair (main mode) */
+  .ptt-pair { display: flex; gap: 8px; }
+  .ptt-btn {
+    flex: 1; padding: 14px 8px; background: #1F4744; border: 2px solid #2B5350;
+    color: #F2EDE4; border-radius: 12px; cursor: pointer; user-select: none;
+    display: flex; flex-direction: column; align-items: center; gap: 4px;
+    font-family: 'Tajawal', sans-serif; font-weight: 700; font-size: 13px;
+    -webkit-tap-highlight-color: transparent; touch-action: manipulation;
+    transition: background 0.1s, border-color 0.1s, transform 0.05s;
+  }
+  .ptt-btn .ptt-icon { font-size: 26px; }
+  .ptt-btn .ptt-lang { font-size: 12px; color: #8FADA9; }
+  .ptt-btn.pressing {
+    background: #FF6F59; border-color: #FF6F59; color: #0D1F1E; transform: scale(0.98);
+  }
+  .ptt-btn.pressing .ptt-lang { color: #0D1F1E; }
+
+  /* Auto mode: smaller mic than before (was 96, now 68) */
+  .convo-auto-inner {
+    display: flex; align-items: center; gap: 12px;
   }
   .convo-mic-big {
-    width: 96px; height: 96px; border-radius: 50%; border: none;
-    background: #E8A33D; color: #0D1F1E; font-size: 42px; cursor: pointer;
+    width: 68px; height: 68px; border-radius: 50%; border: none; flex-shrink: 0;
+    background: #E8A33D; color: #0D1F1E; font-size: 28px; cursor: pointer;
     display: flex; align-items: center; justify-content: center;
-    margin-bottom: 14px; box-shadow: 0 4px 20px rgba(232, 163, 61, 0.25);
+    box-shadow: 0 2px 12px rgba(232, 163, 61, 0.2);
     transition: transform 0.1s;
   }
   .convo-mic-big:active { transform: scale(0.96); }
   .convo-mic-big.on { background: #FF6F59; animation: pulse-ring 1.4s infinite; }
-  .convo-title { font-family: 'Tajawal', sans-serif; font-size: 20px; font-weight: 700; margin: 0 0 4px; }
-  .convo-hint { font-size: 13px; color: #8FADA9; text-align: center; margin: 0 0 8px; }
+  .convo-auto-text { flex: 1; }
+  .convo-title { font-family: 'Tajawal', sans-serif; font-size: 15px; font-weight: 700; margin: 0 0 2px; }
+  .convo-hint { font-size: 12px; color: #8FADA9; margin: 0; line-height: 1.4; }
   .convo-transcript {
     background: #12302E; border: 1px solid #204442; border-radius: 16px;
-    padding: 12px; max-height: 50vh; overflow-y: auto;
+    padding: 10px; min-height: 340px; max-height: calc(100vh - 340px); overflow-y: auto;
   }
   .convo-empty { text-align: center; color: #6B8A87; padding: 30px 10px; font-size: 13px; }
   .turn {
@@ -319,14 +349,42 @@
 
 <!-- =============== VIEW: CONVERSATION =============== -->
 <div class="wrap view" id="viewConvo">
-  <div class="convo-hero">
-    <button class="convo-mic-big" id="convoMicBig" aria-label="ابدأ محادثة تلقائية">🎙</button>
-    <h3 class="convo-title" id="convoTitle">اضغط عشان تبدأ</h3>
-    <p class="convo-hint" id="convoHint">التطبيق هيسمع الاتنين ويترجم بينهم تلقائي</p>
+  <!-- Mode toggle: PTT (default, reliable) vs Auto (hands-free but flaky) -->
+  <div class="convo-mode-strip">
+    <button class="convo-mode-btn active" data-cmode="ptt">📌 اضغط للكلام</button>
+    <button class="convo-mode-btn" data-cmode="auto">🔄 تلقائي (بدون أيادي)</button>
+  </div>
+
+  <!-- Push-to-talk panel: one button per language, hold to talk, release to translate -->
+  <div class="convo-panel" id="convoPttPanel">
+    <div class="ptt-pair">
+      <button class="ptt-btn" id="pttFromBtn" type="button">
+        <span class="ptt-icon">🎙</span>
+        <span>اضغط ودوس</span>
+        <span class="ptt-lang" id="pttFromLangLabel">—</span>
+      </button>
+      <button class="ptt-btn" id="pttToBtn" type="button">
+        <span class="ptt-icon">🎙</span>
+        <span>اضغط ودوس</span>
+        <span class="ptt-lang" id="pttToLangLabel">—</span>
+      </button>
+    </div>
+    <div class="convo-status-line" id="pttStatus">جاهز — اضغط ودوس على لغتك واتكلم</div>
+  </div>
+
+  <!-- Auto panel (hidden by default) -->
+  <div class="convo-panel" id="convoAutoPanel" style="display:none;">
+    <div class="convo-auto-inner">
+      <button class="convo-mic-big" id="convoMicBig" aria-label="ابدأ محادثة تلقائية">🎙</button>
+      <div class="convo-auto-text">
+        <h3 class="convo-title" id="convoTitle">اضغط عشان تبدأ</h3>
+        <p class="convo-hint" id="convoHint">هيسمع الاتنين ويترجم تلقائي</p>
+      </div>
+    </div>
   </div>
 
   <div class="convo-transcript" id="convoTranscript">
-    <div class="convo-empty">لسه ما اتحدثتش. اضغط الميكروفون فوق وابدأ.</div>
+    <div class="convo-empty">لسه ما اتحدثتش. اختار مود وابدأ.</div>
   </div>
 </div>
 
@@ -2355,8 +2413,11 @@ const views = { translate: $("viewTranslate"), convo: $("viewConvo") };
 function switchView(name) {
   tabs.forEach((t) => t.classList.toggle("active", t.dataset.view === name));
   Object.entries(views).forEach(([k, el]) => el.classList.toggle("active", k === name));
-  // If leaving conversation, stop the mic so we don't burn battery
-  if (name !== "convo" && conversationActive) stopConversation();
+  // If leaving conversation, stop any active mic so we don't burn battery
+  if (name !== "convo") {
+    if (conversationActive) stopConversation();
+    if (typeof pttRecognition !== "undefined" && pttRecognition) { try { pttRecognition.stop(); } catch {} }
+  }
 }
 tabs.forEach((t) => t.addEventListener("click", () => switchView(t.dataset.view)));
 
@@ -2398,6 +2459,148 @@ convoMicBig.addEventListener("click", () => {
     startConversationTurn();
   }
 });
+
+// ============================================================
+// Convo mode toggle: Push-to-Talk (default, reliable) vs Auto
+// ============================================================
+const convoModeBtns = document.querySelectorAll(".convo-mode-btn");
+const convoPttPanel = $("convoPttPanel");
+const convoAutoPanel = $("convoAutoPanel");
+let convoMode = "ptt";
+function switchConvoMode(mode) {
+  convoMode = mode;
+  convoModeBtns.forEach((b) => b.classList.toggle("active", b.dataset.cmode === mode));
+  convoPttPanel.style.display = mode === "ptt" ? "" : "none";
+  convoAutoPanel.style.display = mode === "auto" ? "" : "none";
+  // Leaving auto mode should stop any in-flight recognition
+  if (mode !== "auto" && conversationActive) stopConversation();
+  // Leaving PTT should stop any in-flight PTT recognition
+  if (mode !== "ptt" && pttRecognition) { try { pttRecognition.stop(); } catch {} }
+}
+convoModeBtns.forEach((b) => b.addEventListener("click", () => switchConvoMode(b.dataset.cmode)));
+
+// ============================================================
+// Push-to-Talk: press one of the two language buttons to record,
+// release to stop → translate → speak to the OTHER side.
+// Works with both mouse and touch, and cancels safely if the user
+// drags off the button or switches tabs mid-press.
+// ============================================================
+const pttFromBtn = $("pttFromBtn");
+const pttToBtn = $("pttToBtn");
+const pttFromLangLabel = $("pttFromLangLabel");
+const pttToLangLabel = $("pttToLangLabel");
+const pttStatus = $("pttStatus");
+let pttRecognition = null;
+let pttActiveSide = null;
+let pttFinalTranscript = "";
+let pttInterim = "";
+
+function refreshPttLabels() {
+  pttFromLangLabel.textContent = LANGS[fromLang]?.label || fromLang;
+  pttToLangLabel.textContent = LANGS[toLang]?.label || toLang;
+}
+
+function setPttStatus(msg) { pttStatus.textContent = msg; }
+
+async function pttStart(side) {
+  if (pttRecognition) return; // already recording
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) { setPttStatus("المتصفح ده مش بيدعم التسجيل الصوتي — جرّب Chrome"); return; }
+  unlockAudio();
+  const granted = await requestMicAccess();
+  if (!granted) return;
+
+  const btn = side === "from" ? pttFromBtn : pttToBtn;
+  btn.classList.add("pressing");
+  pttActiveSide = side;
+  pttFinalTranscript = "";
+  pttInterim = "";
+
+  pttRecognition = new SR();
+  pttRecognition.lang = RECOGNITION_LANG[langForSide(side)];
+  pttRecognition.interimResults = true;
+  pttRecognition.continuous = true; // keep listening until we call stop()
+
+  pttRecognition.onstart = () => setPttStatus(`بتسمع ${LANGS[langForSide(side)].label}...`);
+  pttRecognition.onerror = (e) => {
+    if (e.error === "not-allowed" || e.error === "service-not-allowed") showMicPermissionHelp();
+    else setPttStatus("خطأ: " + e.error);
+  };
+  pttRecognition.onresult = (event) => {
+    let interim = "";
+    for (let i = event.resultIndex; i < event.results.length; i++) {
+      const r = event.results[i];
+      if (r.isFinal) pttFinalTranscript += (pttFinalTranscript ? " " : "") + r[0].transcript.trim();
+      else interim += r[0].transcript;
+    }
+    pttInterim = interim.trim();
+    const shown = (pttFinalTranscript + " " + pttInterim).trim();
+    if (shown) setPttStatus(`"${shown.slice(0, 60)}"`);
+  };
+  pttRecognition.onend = async () => {
+    const spokenSide = pttActiveSide;
+    const rec = pttRecognition;
+    pttRecognition = null;
+    pttActiveSide = null;
+    pttFromBtn.classList.remove("pressing");
+    pttToBtn.classList.remove("pressing");
+    const transcript = (pttFinalTranscript || pttInterim).trim();
+    if (!transcript) { setPttStatus("مسمعتش صوت — اضغط ودوس واتكلم"); return; }
+    // Translate to the OTHER side and speak it
+    const listenerSide = otherSide(spokenSide);
+    const fromLangCode = langForSide(spokenSide);
+    const toLangCode = langForSide(listenerSide);
+    setPttStatus(`بيترجم (${LANGS[fromLangCode].label} → ${LANGS[toLangCode].label})...`);
+    try {
+      const result = await translateText(transcript, fromLangCode, toLangCode);
+      if (result) {
+        pushTranscriptTurn({
+          side: spokenSide,
+          fromLang: fromLangCode,
+          toLang: toLangCode,
+          source: transcript,
+          translation: result,
+        });
+        saveHistory(fromLangCode, toLangCode, transcript, result);
+        setPttStatus(`✓ ${result.slice(0, 60)}`);
+        // Speak the translation on whichever side it landed
+        programmaticEdit = true;
+        setBoxText(listenerSide, result, false);
+        programmaticEdit = false;
+        await speak(listenerSide);
+      } else {
+        setPttStatus("مقدرش يترجم");
+      }
+    } catch (e) {
+      setPttStatus("فشلت الترجمة: " + (e.message || e));
+    }
+  };
+  try { pttRecognition.start(); } catch (e) { setPttStatus("مقدرش يبدأ: " + e.message); }
+}
+
+function pttStop() {
+  if (!pttRecognition) return;
+  try { pttRecognition.stop(); } catch {}
+  // onend will handle the rest
+}
+
+function bindPtt(btn, side) {
+  const start = (e) => { e.preventDefault(); pttStart(side); };
+  const end = (e) => { e.preventDefault(); pttStop(); };
+  btn.addEventListener("touchstart", start, { passive: false });
+  btn.addEventListener("touchend", end, { passive: false });
+  btn.addEventListener("touchcancel", end);
+  btn.addEventListener("mousedown", start);
+  btn.addEventListener("mouseup", end);
+  btn.addEventListener("mouseleave", end);
+}
+bindPtt(pttFromBtn, "from");
+bindPtt(pttToBtn, "to");
+// Keep PTT labels in sync when the user changes the main language selectors
+fromSelect.addEventListener("change", refreshPttLabels);
+toSelect.addEventListener("change", refreshPttLabels);
+swapBtn.addEventListener("click", refreshPttLabels);
+refreshPttLabels();
 
 // Reflect convo state in the big mic look + title
 function updateConvoUI() {
