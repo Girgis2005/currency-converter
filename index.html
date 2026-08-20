@@ -489,7 +489,7 @@
     </div>
     <p style="font-size:12px; margin:0 0 10px; color:#8FADA9;">وجّه الكاميرا على النص. الترجمة بتتحدّث كل شوية تلقائي.</p>
     <div id="liveCamNoKeyWarn" style="display:none; background:#17322F; border:1px solid #2B5350; color:#C8DEDA; border-radius:8px; padding:8px 10px; font-size:12px; margin-bottom:10px; line-height:1.5;">
-      ℹ️ شغال بالنظام المجاني (Chrome OCR + Google Translate). لو عايز جودة أعلى (خاصة لهجة مصرية طبيعية) حط مفتاح Claude من ⚙.
+      ℹ️ <span id="liveCamStackHint">شغال بالنظام المجاني.</span> لو عايز لهجة مصرية طبيعية حط مفتاح Claude من ⚙.
     </div>
     <div id="liveCamStage" style="position:relative; background:#000; border-radius:12px; overflow:hidden; aspect-ratio:3/4; max-height:60vh;">
       <video id="liveCamVideo" playsinline muted autoplay style="width:100%; height:100%; object-fit:contain; background:#000; display:block;"></video>
@@ -742,6 +742,40 @@ function getModel() {
 
 const ISO_CODE = { "ar-EG": "ar", "en-US": "en", "pt-BR": "pt" };
 
+// ============================================================
+// Chrome On-Device Translator API (Gemini Nano, no key, offline once
+// downloaded). Available in Chrome 138+ on Android. This is essentially
+// the browser-side equivalent of Google ML Kit's translate models
+// that native translator apps (like the one we reverse-engineered)
+// use for their offline mode.
+// ============================================================
+const HAS_CHROME_TRANSLATOR = typeof self !== "undefined" && ("Translator" in self);
+const HAS_CHROME_LANG_DETECT = typeof self !== "undefined" && ("LanguageDetector" in self);
+const chromeTranslatorCache = new Map(); // "from|to" -> Translator instance
+
+async function ensureChromeTranslator(from, to) {
+  if (!HAS_CHROME_TRANSLATOR) return null;
+  const key = `${from}|${to}`;
+  if (chromeTranslatorCache.has(key)) return chromeTranslatorCache.get(key);
+  try {
+    const availability = await self.Translator.availability({ sourceLanguage: from, targetLanguage: to });
+    if (availability === "unavailable") return null;
+    // "downloadable" / "downloading" / "available" — create() triggers download if needed
+    const translator = await self.Translator.create({ sourceLanguage: from, targetLanguage: to });
+    chromeTranslatorCache.set(key, translator);
+    return translator;
+  } catch (e) {
+    console.warn("Chrome Translator create failed:", e.message || e);
+    return null;
+  }
+}
+
+async function translateWithChromeAI(text, from, to) {
+  const translator = await ensureChromeTranslator(ISO_CODE[from], ISO_CODE[to]);
+  if (!translator) throw new Error("Chrome Translator unavailable for this pair");
+  return await translator.translate(text);
+}
+
 // Google Translate's free web endpoint (used by countless browser extensions).
 // No API key, no signup. Handles Arabic, English, Portuguese cleanly.
 // Response shape: [ [ [ "translated", "source", null, null, N ], ... ], ..., "detected-lang", ... ]
@@ -767,8 +801,13 @@ async function translateWithMyMemory(text, from, to) {
   return result;
 }
 
-// Free fallback chain: try Google first (much better quality), then MyMemory.
+// Free fallback chain: Chrome on-device AI (best quality, offline!) > Google
+// free web endpoint > MyMemory (worst but sometimes only one available).
 async function translateWithFreeChain(text, from, to) {
+  if (HAS_CHROME_TRANSLATOR) {
+    try { return await translateWithChromeAI(text, from, to); }
+    catch (e) { /* fall through to Google */ }
+  }
   try { return await translateWithGoogleFree(text, from, to); }
   catch (e) { /* fall through */ }
   return await translateWithMyMemory(text, from, to);
@@ -2399,8 +2438,17 @@ async function openLiveCam() {
   // Default OCR lang follows fromLang the first time; user can override in the modal.
   liveOcrLangCode = liveOcrLangCode || fromLang;
   if (liveCamOcrLangSelect) liveCamOcrLangSelect.value = liveOcrLangCode;
-  // Show/hide the "no API key" warning banner
-  $("liveCamNoKeyWarn").style.display = getApiKey() ? "none" : "block";
+  // Show/hide the "no API key" warning banner + describe which free engines are in play
+  const hasKey = !!getApiKey();
+  $("liveCamNoKeyWarn").style.display = hasKey ? "none" : "block";
+  if (!hasKey) {
+    const parts = [];
+    if (HAS_TEXT_DETECTOR) parts.push("Chrome OCR");
+    else parts.push("Tesseract OCR");
+    if (HAS_CHROME_TRANSLATOR) parts.push("Chrome AI translate (offline)");
+    else parts.push("Google Translate مجاني");
+    $("liveCamStackHint").textContent = `شغال بـ ${parts.join(" + ")}.`;
+  }
   liveCamBackdrop.classList.add("open");
   const ok = await startLiveStream();
   if (ok && !liveAutoTimer) toggleLiveAuto(true);
@@ -2737,7 +2785,11 @@ refreshFavStar();
 updateConvoUI();
 renderTranscript();
 if (!getApiKey()) {
-  showBanner('شغال بالنظام المجاني (Google Translate + Chrome OCR للكاميرا). لو عايز لهجة مصرية دقيقة حط مفتاح Claude من ⚙', "info");
+  const stack = [];
+  if (HAS_CHROME_TRANSLATOR) stack.push("Chrome AI ترجمة (offline)");
+  else stack.push("Google Translate مجاني");
+  if (HAS_TEXT_DETECTOR) stack.push("Chrome OCR");
+  showBanner(`شغال بالنظام المجاني: ${stack.join(" + ")}. لو عايز لهجة مصرية طبيعية حط مفتاح Claude من ⚙`, "info");
 }
 </script>
 </body>
