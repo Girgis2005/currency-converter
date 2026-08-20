@@ -1302,6 +1302,13 @@ function speak(side) {
   return new Promise((resolve) => {
     const text = getBoxText(side);
     if (!text.trim()) return resolve();
+    // Anti-double-speak: if the same text was spoken very recently, skip.
+    // Guards against overlapping speak() calls (PTT onend firing twice on
+    // some browsers, or auto+PTT modes racing).
+    const now = Date.now();
+    if (text === lastSpokenText && now - lastSpokenAt < 2500) return resolve();
+    lastSpokenText = text;
+    lastSpokenAt = now;
     const langCode = langForSide(side);
     getVoicesAsync().then((voices) => {
       const targetSpeech = LANGS[langCode].speech;
@@ -2507,9 +2514,10 @@ let pttRecognition = null;
 let pttActiveSide = null;
 let pttFinalTranscript = "";
 let pttInterim = "";
-let pttConsumedResultCount = 0; // how many results (any kind) we've already read text from
 let pttEnded = false;           // guards the onend logic from firing twice
 let pttSuppressUntil = 0;       // ignore duplicate start/end events within this window (mobile fires touch+mouse)
+let lastSpokenText = "";
+let lastSpokenAt = 0;
 
 function refreshPttLabels() {
   pttFromLangLabel.textContent = LANGS[fromLang]?.label || fromLang;
@@ -2533,7 +2541,6 @@ async function pttStart(side) {
   pttActiveSide = side;
   pttFinalTranscript = "";
   pttInterim = "";
-  pttConsumedResultCount = 0;
   pttEnded = false;
 
   pttRecognition = new SR();
@@ -2547,19 +2554,27 @@ async function pttStart(side) {
     else setPttStatus("خطأ: " + e.error);
   };
   pttRecognition.onresult = (event) => {
-    // Only look at results we haven't already consumed. Some browsers replay
-    // the same final result across events (that's what caused doubled speech).
+    // Rebuild the transcript from scratch on every event so we CAN'T accidentally
+    // accumulate the same phrase twice. Chrome sometimes emits a duplicate final
+    // at a NEW result index after stop() is called (a "final flush"); dedupe
+    // catches that regardless of which index it lands at.
+    const finals = [];
     let interim = "";
-    for (let i = pttConsumedResultCount; i < event.results.length; i++) {
+    for (let i = 0; i < event.results.length; i++) {
       const r = event.results[i];
       if (r.isFinal) {
         const chunk = r[0].transcript.trim();
-        if (chunk) pttFinalTranscript += (pttFinalTranscript ? " " : "") + chunk;
-        pttConsumedResultCount = i + 1;
+        if (!chunk) continue;
+        const last = finals[finals.length - 1] || "";
+        if (chunk === last) continue;                       // exact duplicate → skip
+        if (last && chunk.startsWith(last)) finals[finals.length - 1] = chunk; // extended version → replace
+        else if (last && last.startsWith(chunk)) continue;  // shorter subset of previous → skip
+        else finals.push(chunk);
       } else {
         interim += r[0].transcript;
       }
     }
+    pttFinalTranscript = finals.join(" ");
     pttInterim = interim.trim();
     const shown = (pttFinalTranscript + " " + pttInterim).trim();
     if (shown) setPttStatus(`"${shown.slice(0, 60)}"`);
