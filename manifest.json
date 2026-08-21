@@ -1,7 +1,7 @@
 {
   "name": "جسر · Gesr — مترجم فوري",
   "short_name": "جسر",
-  "description": "ترجمة فورية بين المصري والإنجليزي والبرتغالي — كتابة وصوت",
+  "description": "ترجمة فورية بين المصري والإنجليزي والبرتغالي — كتابة، صوت، صور، ونطق بحروف عربية",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
@@ -15,5 +15,32 @@
     { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
     { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
     { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "share_target": {
+    "action": "share",
+    "method": "POST",
+    "enctype": "multipart/form-data",
+    "params": {
+      "title": "title",
+      "text": "text",
+      "url": "url",
+      "files": [
+        { "name": "image", "accept": ["image/*"] }
+      ]
+    }
+  },
+  "shortcuts": [
+    {
+      "name": "دفتر الكلمات",
+      "short_name": "الدفتر",
+      "url": "./?open=notebook",
+      "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "مراجعة النهاردة",
+      "short_name": "مراجعة",
+      "url": "./?open=review",
+      "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }]
+    }
   ]
 }

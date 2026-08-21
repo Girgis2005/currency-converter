@@ -287,6 +287,118 @@
     width: 16px; height: 16px; border: 2px solid #2B5350; border-top-color: #E8A33D;
     border-radius: 50%; animation: spin 0.7s linear infinite; display: inline-block;
   }
+
+/* ===================== نطق + دفتر الكلمات (v3) ===================== */
+.pron-strip {
+  margin-top: 10px;
+  background: #12302E;
+  border: 1px solid #204442;
+  border-radius: 12px;
+  padding: 10px 12px;
+  display: none;
+}
+.pron-strip.show { display: block; }
+.pron-head {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 11px; color: #8FADA9;
+  font-family: 'JetBrains Mono', monospace;
+  margin-bottom: 6px;
+}
+.pron-head .pron-src { margin-inline-start: auto; opacity: .7; font-size: 10px; }
+.pron-text {
+  direction: rtl; text-align: right;
+  font-size: 17px; line-height: 1.9; color: #F2EDE4; font-weight: 500;
+  word-break: break-word;
+}
+.pron-ipa {
+  direction: ltr; text-align: left;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px; color: #6B8A87; margin-top: 4px;
+}
+.word-chips {
+  display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px;
+}
+.word-chip {
+  background: #0D1F1E; border: 1px solid #204442; color: #F2EDE4;
+  border-radius: 999px; padding: 5px 11px; font-size: 13px;
+  cursor: pointer; font-family: 'Space Grotesk', sans-serif;
+  display: inline-flex; align-items: center; gap: 5px;
+  transition: border-color .15s, background .15s;
+}
+.word-chip:hover, .word-chip:focus { border-color: #E8A33D; }
+.word-chip.known { opacity: .45; }
+.word-chip .chip-pron { font-size: 11px; color: #8FADA9; direction: rtl; }
+.word-chip.saved { border-color: #E8A33D; background: #2A2113; }
+
+.nb-item {
+  background: #12302E; border: 1px solid #204442; border-radius: 12px;
+  padding: 10px 12px; margin-bottom: 8px;
+}
+.nb-item .nb-top { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.nb-word { font-size: 16px; font-weight: 600; color: #F2EDE4; direction: ltr; }
+.nb-pron { font-size: 14px; color: #E8A33D; direction: rtl; }
+.nb-meaning { font-size: 13px; color: #C8DEDA; direction: rtl; margin-top: 4px; }
+.nb-meta {
+  font-size: 10px; color: #6B8A87; font-family: 'JetBrains Mono', monospace;
+  margin-top: 6px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
+}
+.nb-badge {
+  background: #0D1F1E; border: 1px solid #204442; border-radius: 6px;
+  padding: 1px 6px; font-size: 10px;
+}
+.nb-badge.due { border-color: #E8A33D; color: #E8A33D; }
+.nb-del { margin-inline-start: auto; background: none; border: none; color: #6B8A87; cursor: pointer; font-size: 14px; }
+.nb-del:hover { color: #E86A4D; }
+.nb-toolbar { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; align-items: center; }
+.nb-toolbar input[type="search"] {
+  flex: 1 1 130px; background: #0D1F1E; border: 1px solid #204442; border-radius: 10px;
+  color: #F2EDE4; padding: 8px 10px; font-size: 13px; font-family: 'Space Grotesk', sans-serif;
+}
+.nb-chip-filter {
+  background: #0D1F1E; border: 1px solid #204442; color: #8FADA9;
+  border-radius: 999px; padding: 6px 12px; font-size: 12px; cursor: pointer;
+  font-family: 'Space Grotesk', sans-serif;
+}
+.nb-chip-filter.active { background: #E8A33D; color: #0D1F1E; border-color: #E8A33D; font-weight: 700; }
+.nb-stats {
+  font-size: 11px; color: #8FADA9; font-family: 'JetBrains Mono', monospace;
+  margin-bottom: 8px; display: flex; gap: 10px; flex-wrap: wrap;
+}
+
+.rv-card {
+  background: #12302E; border: 1px solid #204442; border-radius: 16px;
+  padding: 22px 16px; text-align: center; min-height: 190px;
+  display: flex; flex-direction: column; justify-content: center; gap: 10px;
+}
+.rv-front { font-size: 26px; font-weight: 700; color: #F2EDE4; direction: ltr; word-break: break-word; }
+.rv-pron { font-size: 19px; color: #E8A33D; direction: rtl; }
+.rv-back { font-size: 17px; color: #C8DEDA; direction: rtl; }
+.rv-hidden { display: none; }
+.rv-actions { display: flex; gap: 8px; margin-top: 12px; }
+.rv-actions .btn { flex: 1; padding: 12px 6px; font-size: 13px; }
+.rv-progress { font-size: 11px; color: #8FADA9; font-family: 'JetBrains Mono', monospace; text-align: center; margin-bottom: 8px; }
+.btn-good { background: #1F7A5C !important; color: #fff !important; border: none !important; }
+.btn-bad  { background: #7A2F1F !important; color: #fff !important; border: none !important; }
+
+.wd-row { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; margin-bottom: 6px; }
+.wd-word { font-size: 24px; font-weight: 700; direction: ltr; color: #F2EDE4; }
+.wd-pron { font-size: 20px; color: #E8A33D; direction: rtl; }
+.wd-ipa { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #6B8A87; direction: ltr; }
+.wd-meaning { font-size: 15px; color: #C8DEDA; direction: rtl; margin: 8px 0 4px; }
+.wd-src { font-size: 10px; color: #6B8A87; font-family: 'JetBrains Mono', monospace; }
+
+html[data-theme="light"] .pron-strip { background: #F4EFE6 !important; border-color: #D9CFBE !important; }
+html[data-theme="light"] .pron-text { color: #1A2B29 !important; }
+html[data-theme="light"] .word-chip { background: #FFF !important; border-color: #D9CFBE !important; color: #1A2B29 !important; }
+html[data-theme="light"] .word-chip.saved { background: #FBEED6 !important; border-color: #C9862A !important; }
+html[data-theme="light"] .nb-item, html[data-theme="light"] .rv-card { background: #F4EFE6 !important; border-color: #D9CFBE !important; }
+html[data-theme="light"] .nb-word, html[data-theme="light"] .rv-front, html[data-theme="light"] .wd-word { color: #1A2B29 !important; }
+html[data-theme="light"] .nb-meaning, html[data-theme="light"] .rv-back, html[data-theme="light"] .wd-meaning { color: #3A4B49 !important; }
+html[data-theme="light"] .nb-toolbar input[type="search"],
+html[data-theme="light"] .nb-chip-filter { background: #FFF !important; border-color: #D9CFBE !important; color: #3A4B49 !important; }
+html[data-theme="light"] .nb-chip-filter.active { background: #C9862A !important; color: #FFF !important; }
+html[data-theme="light"] #notebookBtn { background: #FFF !important; border-color: #D9CFBE !important; color: #1A2B29 !important; }
+
 </style>
 </head>
 <body>
@@ -345,6 +457,22 @@
     <textarea id="outputText" placeholder="هتظهر الترجمة هنا... أو اكتب هنا وهاتترجم للأعلى"></textarea>
     <div class="char-count" id="outputCharCount">0</div>
   </div>
+<!-- شريط النطق بالعربي + شرايح الكلمات -->
+  <div class="pron-strip" id="pronStrip">
+    <div class="pron-head">
+      <span>🔤 النطق بالعربي</span>
+      <span id="pronLangTag"></span>
+      <span class="pron-src" id="pronSrc"></span>
+    </div>
+    <div class="pron-text" id="pronText"></div>
+    <div class="pron-ipa" id="pronIpa"></div>
+    <div class="word-chips" id="wordChips"></div>
+    <div style="display:flex; gap:6px; margin-top:10px; flex-wrap:wrap;">
+      <button class="nb-chip-filter" id="pronSayBtn">🔊 اسمع</button>
+      <button class="nb-chip-filter" id="pronToggleBtn">🔤 النطق: شغال</button>
+      <button class="nb-chip-filter" id="captureAllBtn" style="display:none;">＋ احفظ كل الكلمات</button>
+    </div>
+  </div>
 </div>
 
 <!-- =============== VIEW: CONVERSATION =============== -->
@@ -395,6 +523,7 @@
   <button class="util-btn" id="historyBtn">🕘 السجل</button>
   <button class="util-btn" id="imageBtn">📷 صورة</button>
   <button class="util-btn" id="cameraBtn">📸 كاميرا</button>
+  <button class="util-btn" id="notebookBtn">📓 الدفتر</button>
 </div>
 <input type="file" id="imageInput" accept="image/*" style="display:none;" />
 <input type="file" id="cameraInput" accept="image/*" capture="environment" style="display:none;" />
@@ -528,6 +657,88 @@
   </div>
 </div>
 
+<!-- =============== دفتر الكلمات =============== -->
+<div class="modal-backdrop" id="notebookBackdrop">
+  <div class="modal">
+    <h2>📓 دفتر الكلمات</h2>
+    <p>كل كلمة أو جملة جديدة بتقابلها — من التطبيق ده أو مشاركة من أي تطبيق تاني.</p>
+
+    <div class="nb-toolbar">
+      <input type="search" id="nbSearchInput" placeholder="دوّر على كلمة..." />
+      <button class="nb-chip-filter active" data-nbfilter="all">الكل</button>
+      <button class="nb-chip-filter" data-nbfilter="due">للمراجعة</button>
+      <button class="nb-chip-filter" data-nbfilter="word">كلمات</button>
+      <button class="nb-chip-filter" data-nbfilter="phrase">جمل</button>
+      <button class="nb-chip-filter" data-nbfilter="en">EN</button>
+      <button class="nb-chip-filter" data-nbfilter="pt">PT</button>
+    </div>
+
+    <div class="nb-stats" id="nbStats"></div>
+    <div class="modal-scroll" id="notebookList"></div>
+
+    <div style="margin-top:12px; border-top:1px solid #204442; padding-top:12px;">
+      <label style="display:block; font-size:12px; color:#8FADA9; margin-bottom:6px;">
+        اللغة اللي بتتعلمها (بتتستعمل لما تشارك حاجة من تطبيق تاني)
+      </label>
+      <select id="learnLangSelect" style="width:100%; background:#0D1F1E; border:1px solid #204442; border-radius:10px; color:#F2EDE4; padding:10px 12px; font-size:14px; font-family:'Space Grotesk',sans-serif; margin-bottom:12px;">
+        <option value="pt-BR">Português (BR)</option>
+        <option value="en-US">English</option>
+      </select>
+    </div>
+
+    <div class="modal-actions" style="flex-wrap:wrap; gap:6px;">
+      <button class="btn btn-primary" id="nbReviewBtn" style="flex:1 1 100%;">🎯 ابدأ المراجعة</button>
+      <button class="btn btn-ghost" id="nbExportBtn" style="flex:1 1 30%;">⬇ صدّر</button>
+      <button class="btn btn-ghost" id="nbImportBtn" style="flex:1 1 30%;">⬆ استورد</button>
+      <button class="btn btn-ghost" id="notebookClose" style="flex:1 1 30%;">قفل</button>
+      <input type="file" id="nbImportInput" accept="application/json" style="display:none;" />
+    </div>
+  </div>
+</div>
+
+<!-- =============== المراجعة (بطاقات) =============== -->
+<div class="modal-backdrop" id="reviewBackdrop">
+  <div class="modal">
+    <h2>🎯 مراجعة</h2>
+    <div class="rv-progress" id="rvProgress"></div>
+    <div class="rv-card">
+      <div class="rv-front" id="rvFront">—</div>
+      <div class="rv-pron rv-hidden" id="rvPron"></div>
+      <div class="rv-back rv-hidden" id="rvBack"></div>
+    </div>
+    <div style="display:flex; gap:8px; margin-top:12px;">
+      <button class="btn btn-primary" id="rvShowBtn" style="flex:1;">👁 اكشف</button>
+      <button class="btn btn-ghost" id="rvSayBtn" style="flex:0 0 90px;">🔊</button>
+    </div>
+    <div class="rv-actions" id="rvGradeRow" style="display:none;">
+      <button class="btn btn-bad" id="rvBadBtn">✗ نسيتها</button>
+      <button class="btn btn-good" id="rvGoodBtn">✓ عرفتها</button>
+    </div>
+    <div class="modal-actions" style="margin-top:14px;">
+      <button class="btn btn-ghost" id="reviewClose">قفل</button>
+    </div>
+  </div>
+</div>
+
+<!-- =============== تفاصيل كلمة =============== -->
+<div class="modal-backdrop" id="wordDetailBackdrop">
+  <div class="modal">
+    <div class="wd-row">
+      <span class="wd-word" id="wdWord">—</span>
+      <span class="wd-pron" id="wdPron"></span>
+    </div>
+    <div class="wd-ipa" id="wdIpa"></div>
+    <div class="wd-meaning" id="wdMeaning"></div>
+    <div class="wd-src" id="wdSrc"></div>
+    <div class="wd-src" id="wdCtx" style="margin-top:6px;"></div>
+    <div class="modal-actions" style="margin-top:16px; flex-wrap:wrap; gap:6px;">
+      <button class="btn btn-primary" id="wdSaveBtn" style="flex:1 1 100%;">＋ احفظ في الدفتر</button>
+      <button class="btn btn-ghost" id="wdSayBtn" style="flex:1 1 45%;">🔊 اسمع</button>
+      <button class="btn btn-ghost" id="wordDetailClose" style="flex:1 1 45%;">قفل</button>
+    </div>
+  </div>
+</div>
+
 <script>
 const LANGS = {
   "ar-EG": { label: "مصري", labelEn: "Egyptian Arabic", speech: "ar-EG", dir: "rtl", font: "'Tajawal', sans-serif" },
@@ -549,6 +760,11 @@ let isTranslating = false;
 let conversationActive = false;
 let conversationPaused = false;
 let debounceTimer = null;
+// Every runTranslate() call takes a ticket. When it comes back it only gets to
+// write into the box if no newer call has started since — otherwise a slow
+// request (e.g. a language-switch fired just before you kept typing) lands last
+// and clobbers the fresh translation with a stale one.
+let translateSeq = 0;
 let recognition = null;
 
 const $ = (id) => document.getElementById(id);
@@ -752,28 +968,59 @@ const ISO_CODE = { "ar-EG": "ar", "en-US": "en", "pt-BR": "pt" };
 const HAS_CHROME_TRANSLATOR = typeof self !== "undefined" && ("Translator" in self);
 const HAS_CHROME_LANG_DETECT = typeof self !== "undefined" && ("LanguageDetector" in self);
 const chromeTranslatorCache = new Map(); // "from|to" -> Translator instance
+const chromeTranslatorDead = new Set(); // pairs that hung or failed — never retried this session
+
+// Chrome's Translator API can hang forever (availability() never settles when the
+// on-device model is missing). Every call into it MUST be raced against a timeout,
+// otherwise the whole translate chain blocks and the app just sits on the dots.
+function withTimeout(promise, ms, label) {
+  let timer;
+  return Promise.race([
+    Promise.resolve(promise).then((v) => { clearTimeout(timer); return v; }),
+    new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('timeout: ' + label)), ms); }),
+  ]);
+}
+const CHROME_T_MS = { availability: 2000, create: 6000, translate: 6000 };
 
 async function ensureChromeTranslator(from, to) {
   if (!HAS_CHROME_TRANSLATOR) return null;
   const key = `${from}|${to}`;
   if (chromeTranslatorCache.has(key)) return chromeTranslatorCache.get(key);
+  if (chromeTranslatorDead.has(key)) return null;
   try {
-    const availability = await self.Translator.availability({ sourceLanguage: from, targetLanguage: to });
-    if (availability === "unavailable") return null;
-    // "downloadable" / "downloading" / "available" — create() triggers download if needed
-    const translator = await self.Translator.create({ sourceLanguage: from, targetLanguage: to });
+    const availability = await withTimeout(
+      self.Translator.availability({ sourceLanguage: from, targetLanguage: to }),
+      CHROME_T_MS.availability, 'availability'
+    );
+    // Only "available" means the model is already on the device. "downloadable"/
+    // "downloading" means create() would block on a download, so we skip straight
+    // to the network path instead of freezing the UI.
+    if (availability !== "available") { chromeTranslatorDead.add(key); return null; }
+    const translator = await withTimeout(
+      self.Translator.create({ sourceLanguage: from, targetLanguage: to }),
+      CHROME_T_MS.create, 'create'
+    );
     chromeTranslatorCache.set(key, translator);
     return translator;
   } catch (e) {
-    console.warn("Chrome Translator create failed:", e.message || e);
+    console.warn("Chrome Translator unavailable:", e.message || e);
+    chromeTranslatorDead.add(key);
     return null;
   }
 }
 
 async function translateWithChromeAI(text, from, to) {
+  const key = `${ISO_CODE[from]}|${ISO_CODE[to]}`;
   const translator = await ensureChromeTranslator(ISO_CODE[from], ISO_CODE[to]);
   if (!translator) throw new Error("Chrome Translator unavailable for this pair");
-  return await translator.translate(text);
+  try {
+    return await withTimeout(translator.translate(text), CHROME_T_MS.translate, 'translate');
+  } catch (e) {
+    // A translator that stalls once will stall again — drop it and use the network.
+    chromeTranslatorCache.delete(key);
+    chromeTranslatorDead.add(key);
+    throw e;
+  }
 }
 
 // Google Translate's free web endpoint (used by countless browser extensions).
@@ -881,31 +1128,46 @@ async function runTranslate(side, autoSpeak) {
   const from = side;
   const to = otherSide(side);
   const text = getBoxText(from);
-  programmaticEdit = true;
+  const myTurn = ++translateSeq;
+
+  // programmaticEdit suppresses the input listeners so our own writes do not
+  // trigger another translation. It must be held ONLY around the write itself:
+  // holding it across the network await meant every character typed while a
+  // translation was in flight got dropped, and the box kept showing the older
+  // sentence.
+  const write = (targetSide, value, isPlaceholder) => {
+    programmaticEdit = true;
+    try { setBoxText(targetSide, value, isPlaceholder); }
+    finally { programmaticEdit = false; }
+  };
+
+  if (!text.trim()) {
+    write(to, "", true);
+    if (to === "to") speakToBtn.disabled = true; else speakFromBtn.disabled = true;
+    if (typeof refreshFavStar === "function") refreshFavStar();
+    updateCharCount();
+    setTranslating(false);
+    if (typeof renderPronFor === "function") renderPronFor();
+    return;
+  }
+
+  setTranslating(true);
   try {
-    if (!text.trim()) {
-      setBoxText(to, "", true);
-      if (to === "to") speakToBtn.disabled = true; else speakFromBtn.disabled = true;
-      if (typeof refreshFavStar === "function") refreshFavStar();
-      updateCharCount();
-      return;
-    }
-    setTranslating(true);
-    try {
-      const result = await translateText(text, langForSide(from), langForSide(to));
-      setBoxText(to, result, !result);
-      if (to === "to") speakToBtn.disabled = !result; else speakFromBtn.disabled = !result;
-      if (result && autoSpeak) await speak(to);
-      if (result) saveHistory(langForSide(from), langForSide(to), text, result);
-    } catch (e) {
-      // banner already shown
-    } finally {
+    const result = await translateText(text, langForSide(from), langForSide(to));
+    if (myTurn !== translateSeq) return; // a newer translation superseded this one
+    write(to, result, !result);
+    if (to === "to") speakToBtn.disabled = !result; else speakFromBtn.disabled = !result;
+    if (result && autoSpeak) await speak(to);
+    if (result) saveHistory(langForSide(from), langForSide(to), text, result);
+  } catch (e) {
+    // banner already shown
+  } finally {
+    if (myTurn === translateSeq) {
       setTranslating(false);
       if (typeof refreshFavStar === "function") refreshFavStar();
       updateCharCount();
+      if (typeof renderPronFor === "function") renderPronFor();
     }
-  } finally {
-    programmaticEdit = false;
   }
 }
 
@@ -2785,12 +3047,839 @@ refreshFavStar();
 updateConvoUI();
 renderTranscript();
 if (!getApiKey()) {
-  const stack = [];
-  if (HAS_CHROME_TRANSLATOR) stack.push("Chrome AI ترجمة (offline)");
-  else stack.push("Google Translate مجاني");
+  const stack = ["Google Translate مجاني"];
+  if (HAS_CHROME_TRANSLATOR) stack.unshift("Chrome AI offline (لو النموذج متنزّل)");
   if (HAS_TEXT_DETECTOR) stack.push("Chrome OCR");
   showBanner(`شغال بالنظام المجاني: ${stack.join(" + ")}. لو عايز لهجة مصرية طبيعية حط مفتاح Claude من ⚙`, "info");
 }
+</script>
+
+<script>
+/* =========================================================================
+   جسر — إضافة v3
+   1) النطق بحروف عربية (welcome → ويلكم)
+   2) دفتر الكلمات: التقاط أي كلمة/جملة من أي تطبيق + مراجعة متباعدة
+   3) استقبال الصور المشاركة (اسكرين شوت) → قراءة + ترجمة + التقاط الكلمات
+
+   ملف منفصل عن السكربت الأصلي عن قصد: كل ده مبني *فوق* الموجود،
+   ومش بيلمس أي دالة قديمة. بيستعمل الجلوبال بتوعها (translateText،
+   showBanner، runTranslate، processImageFile...) لأنهم في نفس السكوب.
+   ========================================================================= */
+
+/* ---------------------------------------------------------------- القاموس */
+
+const PRON_DICT_URL = { "en-US": "data/pron-en.json", "pt-BR": "data/pron-pt.json" };
+const PRON_LEARNED_KEY = "gesr_pron_learned"; // نطق اتعلمناه من Claude
+const pronDicts = {};        // lang -> { word: [pron, ipa, meaning] }
+const pronDictPromise = {};  // lang -> Promise (عشان ما نحمّلش مرتين)
+
+function isLatinLang(lang) { return lang === "en-US" || lang === "pt-BR"; }
+
+async function loadPronDict(lang) {
+  if (!isLatinLang(lang)) return null;
+  if (pronDicts[lang]) return pronDicts[lang];
+  if (pronDictPromise[lang]) return pronDictPromise[lang];
+  pronDictPromise[lang] = (async () => {
+    try {
+      const res = await fetch(PRON_DICT_URL[lang], { cache: "force-cache" });
+      if (!res.ok) throw new Error("dict " + res.status);
+      pronDicts[lang] = await res.json();
+    } catch (e) {
+      console.warn("pron dict failed:", lang, e.message || e);
+      pronDicts[lang] = {}; // نكمل بالقواعد بس
+    }
+    return pronDicts[lang];
+  })();
+  return pronDictPromise[lang];
+}
+
+function loadLearnedPron() {
+  try { return JSON.parse(localStorage.getItem(PRON_LEARNED_KEY) || "{}"); }
+  catch (e) { return {}; }
+}
+function saveLearnedPron(map) {
+  try {
+    // سقف بسيط عشان localStorage ما يتملاش
+    const keys = Object.keys(map);
+    if (keys.length > 3000) {
+      const trimmed = {};
+      keys.slice(-3000).forEach((k) => { trimmed[k] = map[k]; });
+      map = trimmed;
+    }
+    localStorage.setItem(PRON_LEARNED_KEY, JSON.stringify(map));
+  } catch (e) { /* ممتلي — مش مشكلة */ }
+}
+let learnedPron = loadLearnedPron();
+
+/* ------------------------------------------------- الترجمة الصوتية بالقواعد */
+
+// القواعد بتتطبق من أول الكلمة لآخرها، أول قاعدة تطابق هي اللي بتتنفذ،
+// فالترتيب مهم: الأطول والأخص الأول.
+function compileRules(pairs) {
+  return pairs.map(([src, rep]) => [new RegExp(src, "yu"), rep]);
+}
+function applyRules(word, rules) {
+  let out = "", i = 0, guard = 0;
+  while (i < word.length && guard++ < 200) {
+    let hit = false;
+    for (const [re, rep] of rules) {
+      re.lastIndex = i;
+      const m = re.exec(word);
+      if (m && m.index === i && m[0].length) {
+        out += rep;
+        i += m[0].length;
+        hit = true;
+        break;
+      }
+    }
+    if (!hit) i++; // حرف مش معروف — نتخطاه
+  }
+  return out;
+}
+
+const END = "(?![\\s\\S])";   // آخر الكلمة
+const START = "(?<![\\s\\S])"; // أول الكلمة
+const PT_VOWEL = "aeiouáéíóúâêôàãõ";
+
+const PT_RULES = compileRules([
+  ["ções", "سوينش"], ["ção", "ساو"], ["ão", "او"], ["ãe", "اين"], ["õe", "وين"],
+  ["nh", "ني"], ["lh", "لي"], ["ch", "ش"],
+  [START + "r", "ه"], ["rr", "ه"],
+  ["ss", "س"], ["ç", "س"],
+  ["qu(?=[eiéê])", "ك"], ["qu", "كو"], ["gu(?=[eiéê])", "غ"],
+  ["c(?=[eiéêí])", "س"], ["c", "ك"],
+  ["g(?=[eiéêí])", "ج"], ["g", "غ"],
+  ["j", "ج"], ["x", "ش"], ["h", ""],
+  ["nte" + END, "نتشي"],
+  ["t[ie]" + END, "تشي"], ["d[ie]" + END, "جي"],
+  ["ti(?=[" + PT_VOWEL + "])", "تش"], ["di(?=[" + PT_VOWEL + "])", "ج"],
+  ["(?<=[" + PT_VOWEL + "])s(?=[" + PT_VOWEL + "])", "ز"],
+  ["z" + END, "س"], ["z", "ز"], ["s", "س"],
+  ["ou", "و"], ["ei", "ي"], ["ai", "اي"], ["au", "او"], ["eu", "يو"],
+  ["l" + END, "و"], ["l(?=[bcdfgjkmnpqstvxz])", "و"], ["l", "ل"],
+  ["m" + END, "ن"],
+  ["e" + END, "ي"], ["o" + END, "و"],
+  ["[aáàâã]", "ا"], ["[eéê]", "ي"], ["[ií]", "ي"], ["[oóôõ]", "و"], ["[uú]", "و"],
+  ["b", "ب"], ["d", "د"], ["f", "ف"], ["k", "ك"], ["m", "م"], ["n", "ن"],
+  ["p", "ب"], ["r", "ر"], ["t", "ت"], ["v", "ڤ"], ["w", "و"], ["y", "ي"],
+]);
+
+const EN_RULES = compileRules([
+  ["tion" + END, "شن"], ["sion" + END, "جن"], ["ture" + END, "تشر"],
+  ["ough", "أو"], ["igh", "اي"], ["tch", "تش"],
+  ["ch", "تش"], ["sh", "ش"], ["ph", "ف"], ["th", "ث"], ["wh", "و"],
+  ["ck", "ك"], ["qu", "كو"],
+  [START + "kn", "ن"], [START + "wr", "ر"], [START + "ps", "س"],
+  ["ee", "ي"], ["ea", "ي"], ["oo", "و"], ["ou", "او"], ["ow", "او"],
+  ["oa", "أو"], ["ai", "يه"], ["ay", "يه"], ["ey", "ي"], ["oi", "وي"],
+  ["oy", "وي"], ["au", "و"], ["aw", "و"],
+  ["ar", "ار"], ["or", "ور"], ["ir", "ير"], ["ur", "ير"], ["er" + END, "ر"],
+  ["e" + END, ""], ["y" + END, "ي"],
+  ["c(?=[eiy])", "س"], ["c", "ك"], ["g(?=[eiy])", "ج"], ["g", "ج"],
+  ["a", "ا"], ["e", "ي"], ["i", "ي"], ["o", "و"], ["u", "ا"],
+  ["b", "ب"], ["d", "د"], ["f", "ف"], ["h", "ه"], ["j", "ج"], ["k", "ك"],
+  ["l", "ل"], ["m", "م"], ["n", "ن"], ["p", "ب"], ["r", "ر"], ["s", "س"],
+  ["t", "ت"], ["v", "ف"], ["w", "و"], ["x", "كس"], ["z", "ز"],
+]);
+
+function collapseDoubles(w) {
+  return w.replace(/([bcdfghjklmnpqrstvwxz])\1+/gi, "$1");
+}
+
+function translitByRules(word, lang) {
+  const w = word.toLowerCase();
+  if (lang === "pt-BR") return applyRules(w, PT_RULES);
+  return applyRules(collapseDoubles(w), EN_RULES);
+}
+
+/* -------------------------------------------------------- بحث عن نطق كلمة */
+
+const WORD_SPLIT_RE = /[^\p{L}\p{M}'’-]+/u;
+
+function normalizeWord(w) {
+  return String(w || "").toLowerCase().replace(/^[^\p{L}]+|[^\p{L}]+$/gu, "");
+}
+
+// أشكال احتياطية للبحث في القاموس (جمع/تصريف بسيط)
+function wordVariants(w, lang) {
+  const out = [w];
+  if (lang === "en-US") {
+    if (w.endsWith("ies") && w.length > 4) out.push(w.slice(0, -3) + "y");
+    if (w.endsWith("es") && w.length > 3) out.push(w.slice(0, -2));
+    if (w.endsWith("s") && w.length > 3) out.push(w.slice(0, -1));
+    if (w.endsWith("ing") && w.length > 5) { out.push(w.slice(0, -3)); out.push(w.slice(0, -3) + "e"); }
+    if (w.endsWith("ed") && w.length > 4) { out.push(w.slice(0, -2)); out.push(w.slice(0, -1)); }
+  } else if (lang === "pt-BR") {
+    if (w.endsWith("s") && w.length > 3) out.push(w.slice(0, -1));
+    if (w.endsWith("es") && w.length > 4) out.push(w.slice(0, -2));
+  }
+  return out;
+}
+
+// بيرجع { pron, ipa, meaning, src } — src: dict | learned | rules
+function lookupWord(word, lang) {
+  const w = normalizeWord(word);
+  if (!w) return null;
+  const dict = pronDicts[lang] || {};
+  for (const v of wordVariants(w, lang)) {
+    if (dict[v]) {
+      const [pron, ipa, meaning] = dict[v];
+      return { word: w, pron, ipa: ipa || "", meaning: meaning || "", src: "dict" };
+    }
+  }
+  const lk = learnedPron[lang + "|" + w];
+  if (lk) return { word: w, pron: lk[0], ipa: lk[1] || "", meaning: lk[2] || "", src: "learned" };
+  return { word: w, pron: translitByRules(w, lang), ipa: "", meaning: "", src: "rules" };
+}
+
+function pronForText(text, lang) {
+  const parts = String(text).split(WORD_SPLIT_RE).filter(Boolean);
+  return parts.map((p) => (lookupWord(p, lang) || {}).pron || "").filter(Boolean).join(" ");
+}
+
+/* --------------------- تحسين النطق بـ Claude (لو في مفتاح) للكلمات المجهولة */
+
+async function enrichWithClaude(words, lang) {
+  const apiKey = typeof getApiKey === "function" ? getApiKey() : "";
+  if (!apiKey || !words.length) return 0;
+  const langName = lang === "pt-BR" ? "Brazilian Portuguese" : "English";
+  const system =
+    "You transcribe pronunciation for Arabic speakers. For each word given, reply with one line per word in the exact format:\n" +
+    "word\\tarabic_transcription\\tIPA\\tarabic_meaning\n" +
+    "The arabic_transcription must be written in ARABIC LETTERS approximating how the word SOUNDS in " + langName +
+    " (e.g. welcome -> ويلكم). No extra text, no numbering, no explanation.";
+  try {
+    const res = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": apiKey,
+        "anthropic-version": "2023-06-01",
+        "anthropic-dangerous-direct-browser-access": "true",
+      },
+      body: JSON.stringify({
+        model: typeof getModel === "function" ? getModel() : "claude-sonnet-4-5",
+        max_tokens: 1500,
+        system,
+        messages: [{ role: "user", content: words.join("\n") }],
+      }),
+    });
+    if (!res.ok) return 0;
+    const data = await res.json();
+    const block = (data.content || []).find((b) => b.type === "text");
+    if (!block) return 0;
+    let n = 0;
+    for (const line of block.text.split("\n")) {
+      const cols = line.split("\t").map((s) => s.trim());
+      if (cols.length < 2 || !cols[0] || !cols[1]) continue;
+      learnedPron[lang + "|" + normalizeWord(cols[0])] = [cols[1], cols[2] || "", cols[3] || ""];
+      n++;
+    }
+    if (n) saveLearnedPron(learnedPron);
+    return n;
+  } catch (e) { return 0; }
+}
+
+/* ------------------------------------------------------------- واجهة النطق */
+
+const PRON_ON_KEY = "gesr_pron_on";
+let pronOn = localStorage.getItem(PRON_ON_KEY) !== "0";
+
+function pronSideAndLang() {
+  // نعرض النطق للجانب اللي فيه لغة لاتينية (إنجليزي/برتغالي)
+  if (isLatinLang(toLang) && outputText.value.trim()) return { side: "to", lang: toLang, text: outputText.value };
+  if (isLatinLang(fromLang) && sourceText.value.trim()) return { side: "from", lang: fromLang, text: sourceText.value };
+  return null;
+}
+
+let pronRenderSeq = 0;
+async function renderPronFor() {
+  const strip = document.getElementById("pronStrip");
+  if (!strip) return;
+  const target = pronSideAndLang();
+  if (!pronOn || !target) { strip.classList.remove("show"); return; }
+
+  const myTurn = ++pronRenderSeq;
+  await loadPronDict(target.lang);
+  if (myTurn !== pronRenderSeq) return;
+
+  const words = target.text.split(WORD_SPLIT_RE).map(normalizeWord).filter(Boolean);
+  if (!words.length) { strip.classList.remove("show"); return; }
+
+  const hits = words.map((w) => lookupWord(w, target.lang));
+  document.getElementById("pronText").textContent = hits.map((h) => h.pron).join(" ");
+  const ipa = hits.map((h) => h.ipa).filter(Boolean).join(" ");
+  document.getElementById("pronIpa").textContent = ipa;
+  const guessed = hits.filter((h) => h.src === "rules").length;
+  document.getElementById("pronSrc").textContent =
+    guessed ? `${words.length - guessed}/${words.length} من القاموس` : "من القاموس";
+  document.getElementById("pronLangTag").textContent = LANGS[target.lang].label;
+
+  // شرايح الكلمات
+  const chipHost = document.getElementById("wordChips");
+  chipHost.innerHTML = "";
+  const seen = new Set();
+  for (const h of hits) {
+    if (seen.has(h.word)) continue;
+    seen.add(h.word);
+    const b = document.createElement("button");
+    b.className = "word-chip" + (nbHas(h.word, target.lang) ? " saved" : "");
+    b.innerHTML = `<span>${escapeHtmlLite(h.word)}</span><span class="chip-pron">${escapeHtmlLite(h.pron)}</span>`;
+    b.addEventListener("click", () => openWordDetail(h.word, target.lang, target.text));
+    chipHost.appendChild(b);
+  }
+  strip.classList.add("show");
+
+  // لو في مفتاح Claude، حسّن الكلمات اللي اتخمّنت بالقواعد في الخلفية
+  const unknown = [...new Set(hits.filter((h) => h.src === "rules").map((h) => h.word))].slice(0, 25);
+  if (unknown.length && typeof getApiKey === "function" && getApiKey()) {
+    enrichWithClaude(unknown, target.lang).then((n) => {
+      if (n && myTurn === pronRenderSeq) renderPronFor();
+    });
+  }
+}
+
+function escapeHtmlLite(s) {
+  return String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+
+/* --------------------------------------------------------- نطق كلمة واحدة */
+
+function speakWord(text, lang) {
+  try {
+    if (!("speechSynthesis" in window)) return;
+    speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = lang === "pt-BR" ? "pt-BR" : "en-US";
+    u.rate = 0.85;
+    const voices = speechSynthesis.getVoices() || [];
+    const v = voices.find((x) => x.lang && x.lang.toLowerCase().startsWith(u.lang.toLowerCase().slice(0, 2)));
+    if (v) u.voice = v;
+    speechSynthesis.speak(u);
+  } catch (e) { /* تجاهل */ }
+}
+
+/* ============================================================ دفتر الكلمات */
+
+const NOTEBOOK_KEY = "gesr_notebook";
+const NB_MAX = 5000;
+const NB_INTERVALS = [0, 1, 3, 7, 16, 35]; // أيام لكل صندوق (Leitner)
+
+function nbLoad() {
+  try { return JSON.parse(localStorage.getItem(NOTEBOOK_KEY) || "[]"); }
+  catch (e) { return []; }
+}
+function nbSave(list) {
+  try { localStorage.setItem(NOTEBOOK_KEY, JSON.stringify(list.slice(-NB_MAX))); }
+  catch (e) { showBanner("مساحة التخزين اتملت — صدّر الدفتر وامسح القديم", "error"); }
+  if (typeof window.refreshDueBadge === "function") window.refreshDueBadge();
+}
+function nbKey(word, lang) { return normalizeWord(word) + "|" + lang; }
+function nbHas(word, lang) {
+  const k = nbKey(word, lang);
+  return nbLoad().some((e) => nbKey(e.w, e.lang) === k);
+}
+function todayStamp() { return new Date().toISOString().slice(0, 10); }
+function daysFromToday(n) {
+  const d = new Date();
+  d.setDate(d.getDate() + n);
+  return d.toISOString().slice(0, 10);
+}
+
+// entry: { id, w, lang, pron, ipa, mean, ctx, kind, ts, box, due, hit, miss }
+function nbAdd(entry) {
+  const list = nbLoad();
+  const k = nbKey(entry.w, entry.lang);
+  const existing = list.find((e) => nbKey(e.w, e.lang) === k);
+  if (existing) {
+    // موجودة قبل كده — نحدّث الناقص بس
+    existing.pron = existing.pron || entry.pron;
+    existing.ipa = existing.ipa || entry.ipa;
+    existing.mean = existing.mean || entry.mean;
+    existing.ctx = existing.ctx || entry.ctx;
+    nbSave(list);
+    return { added: false, entry: existing };
+  }
+  const e = Object.assign({
+    id: "w" + Date.now().toString(36) + Math.floor(performance.now() % 1000).toString(36),
+    kind: String(entry.w).trim().includes(" ") ? "phrase" : "word",
+    ts: todayStamp(),
+    box: 0,
+    due: todayStamp(),
+    hit: 0,
+    miss: 0,
+  }, entry);
+  list.push(e);
+  nbSave(list);
+  return { added: true, entry: e };
+}
+function nbRemove(id) { nbSave(nbLoad().filter((e) => e.id !== id)); }
+function nbDue() {
+  const t = todayStamp();
+  return nbLoad().filter((e) => (e.due || t) <= t);
+}
+function nbGrade(id, good) {
+  const list = nbLoad();
+  const e = list.find((x) => x.id === id);
+  if (!e) return;
+  if (good) { e.box = Math.min((e.box || 0) + 1, NB_INTERVALS.length - 1); e.hit = (e.hit || 0) + 1; }
+  else { e.box = 0; e.miss = (e.miss || 0) + 1; }
+  e.due = daysFromToday(NB_INTERVALS[e.box]);
+  nbSave(list);
+}
+
+// حفظ كلمة مع جلب معناها لو مش في القاموس
+async function nbCapture(word, lang, ctx) {
+  await loadPronDict(lang);
+  const hit = lookupWord(word, lang) || {};
+  let mean = hit.meaning || "";
+  if (!mean) {
+    try { mean = await translateText(normalizeWord(word), lang, "ar-EG"); }
+    catch (e) { mean = ""; }
+  }
+  const r = nbAdd({ w: normalizeWord(word), lang, pron: hit.pron || "", ipa: hit.ipa || "", mean, ctx: ctx || "" });
+  return r;
+}
+
+/* --------------------------------------------------------- نافذة تفاصيل كلمة */
+
+let wdCurrent = null;
+async function openWordDetail(word, lang, ctx) {
+  wdCurrent = { word: normalizeWord(word), lang, ctx: ctx || "" };
+  const back = document.getElementById("wordDetailBackdrop");
+  await loadPronDict(lang);
+  const hit = lookupWord(word, lang) || {};
+  document.getElementById("wdWord").textContent = hit.word || word;
+  document.getElementById("wdPron").textContent = hit.pron || "—";
+  document.getElementById("wdIpa").textContent = hit.ipa || "";
+  document.getElementById("wdSrc").textContent =
+    hit.src === "dict" ? "من قاموس لو لينجو" : hit.src === "learned" ? "متعلّمة من Claude" : "تقريبية بالقواعد";
+  const meanEl = document.getElementById("wdMeaning");
+  meanEl.textContent = hit.meaning || "جاري جلب المعنى...";
+  document.getElementById("wdCtx").textContent = ctx ? "في جملة: " + ctx.slice(0, 120) : "";
+  const saveBtn = document.getElementById("wdSaveBtn");
+  const already = nbHas(hit.word || word, lang);
+  saveBtn.textContent = already ? "✓ في الدفتر" : "＋ احفظ في الدفتر";
+  saveBtn.disabled = already;
+  back.classList.add("open");
+
+  if (!hit.meaning) {
+    try {
+      const m = await translateText(hit.word || word, lang, "ar-EG");
+      if (wdCurrent && wdCurrent.word === (hit.word || word)) meanEl.textContent = m || "—";
+      wdCurrent.fetchedMean = m || "";
+    } catch (e) { meanEl.textContent = "—"; }
+  } else {
+    wdCurrent.fetchedMean = hit.meaning;
+  }
+}
+
+/* -------------------------------------------------------------- عرض الدفتر */
+
+let nbFilter = "all";
+let nbSearch = "";
+
+function renderNotebook() {
+  const host = document.getElementById("notebookList");
+  const list = nbLoad().slice().reverse();
+  const t = todayStamp();
+  const filtered = list.filter((e) => {
+    if (nbFilter === "word" && e.kind !== "word") return false;
+    if (nbFilter === "phrase" && e.kind !== "phrase") return false;
+    if (nbFilter === "due" && (e.due || t) > t) return false;
+    if (nbFilter === "en" && e.lang !== "en-US") return false;
+    if (nbFilter === "pt" && e.lang !== "pt-BR") return false;
+    if (nbSearch) {
+      const hay = (e.w + " " + (e.mean || "") + " " + (e.pron || "") + " " + (e.ctx || "")).toLowerCase();
+      if (!hay.includes(nbSearch.toLowerCase())) return false;
+    }
+    return true;
+  });
+
+  const dueCount = list.filter((e) => (e.due || t) <= t).length;
+  document.getElementById("nbStats").innerHTML =
+    `<span>الكل: ${list.length}</span><span>للمراجعة النهاردة: ${dueCount}</span>` +
+    `<span>إنجليزي: ${list.filter((e) => e.lang === "en-US").length}</span>` +
+    `<span>برتغالي: ${list.filter((e) => e.lang === "pt-BR").length}</span>`;
+
+  if (!filtered.length) {
+    host.innerHTML = `<p style="color:#8FADA9; font-size:13px; text-align:center; padding:20px 0;">
+      مفيش حاجة هنا لسه. شارك أي كلمة من أي تطبيق مع «جسر»، أو دوس على أي كلمة تحت الترجمة.</p>`;
+    return;
+  }
+
+  host.innerHTML = filtered.map((e) => `
+    <div class="nb-item" data-id="${e.id}">
+      <div class="nb-top">
+        <span class="nb-word">${escapeHtmlLite(e.w)}</span>
+        <span class="nb-pron">${escapeHtmlLite(e.pron || "")}</span>
+        <button class="nb-del" data-del="${e.id}" aria-label="امسح">🗑</button>
+      </div>
+      <div class="nb-meaning">${escapeHtmlLite(e.mean || "—")}</div>
+      ${e.ctx ? `<div class="nb-meaning" style="opacity:.6; font-size:11px;">${escapeHtmlLite(e.ctx.slice(0, 90))}</div>` : ""}
+      <div class="nb-meta">
+        <span class="nb-badge">${e.lang === "pt-BR" ? "PT" : "EN"}</span>
+        <span class="nb-badge">${e.kind === "phrase" ? "جملة" : "كلمة"}</span>
+        <span class="nb-badge ${(e.due || t) <= t ? "due" : ""}">صندوق ${e.box || 0}</span>
+        <span>${e.ts || ""}</span>
+        <button class="nb-del" data-say="${e.id}" style="margin-inline-start:0;" aria-label="انطق">🔊</button>
+      </div>
+    </div>`).join("");
+
+  host.querySelectorAll("[data-del]").forEach((b) =>
+    b.addEventListener("click", () => { nbRemove(b.dataset.del); renderNotebook(); renderPronFor(); }));
+  host.querySelectorAll("[data-say]").forEach((b) =>
+    b.addEventListener("click", () => {
+      const e = nbLoad().find((x) => x.id === b.dataset.say);
+      if (e) speakWord(e.w, e.lang);
+    }));
+}
+
+/* ------------------------------------------------------------ وضع المراجعة */
+
+let rvQueue = [];
+let rvIndex = 0;
+
+function startReview() {
+  // الأقدم استحقاقًا الأول، وبعدين الأكتر خطأ — الحاجات الصعبة تيجي بدري
+  rvQueue = nbDue().sort((a, b) =>
+    (a.due || "").localeCompare(b.due || "") || (b.miss || 0) - (a.miss || 0));
+  rvIndex = 0;
+  if (!rvQueue.length) {
+    showBanner("مفيش حاجة للمراجعة النهاردة — كله متذاكر 👌", "info");
+    return;
+  }
+  document.getElementById("notebookBackdrop").classList.remove("open");
+  document.getElementById("reviewBackdrop").classList.add("open");
+  renderReviewCard();
+}
+
+function renderReviewCard() {
+  const card = nbQueueCurrent();
+  const front = document.getElementById("rvFront");
+  const pron = document.getElementById("rvPron");
+  const back = document.getElementById("rvBack");
+  const prog = document.getElementById("rvProgress");
+  if (!card) {
+    front.textContent = "خلصت 🎉";
+    pron.textContent = "";
+    back.textContent = "راجعت كل الكلمات المستحقة النهاردة";
+    back.classList.remove("rv-hidden");
+    pron.classList.remove("rv-hidden");
+    prog.textContent = "";
+    document.getElementById("rvShowBtn").style.display = "none";
+    document.getElementById("rvGradeRow").style.display = "none";
+    return;
+  }
+  front.textContent = card.w;
+  pron.textContent = card.pron || "";
+  back.textContent = card.mean || "—";
+  pron.classList.add("rv-hidden");
+  back.classList.add("rv-hidden");
+  prog.textContent = `${rvIndex + 1} / ${rvQueue.length}`;
+  document.getElementById("rvShowBtn").style.display = "";
+  document.getElementById("rvGradeRow").style.display = "none";
+}
+function nbQueueCurrent() { return rvQueue[rvIndex]; }
+
+/* --------------------------------------------------- تصدير/استيراد الدفتر */
+
+// نفس تركيبة كلمات Lu Lingo عشان تتحقن هناك على طول
+function nbExportLuLingo() {
+  const list = nbLoad();
+  const shape = (e) => ({
+    word: e.w,
+    pos: "",
+    ipa: e.ipa || "",
+    ar_pron: e.pron || "",
+    ar_meaning: e.mean || "",
+    en_def: "",
+    example: e.ctx || "",
+    ar_example: "",
+    level: "A2",
+    freq: 3,
+  });
+  return {
+    gesr_notebook_version: 1,
+    exported: todayStamp(),
+    en: list.filter((e) => e.lang === "en-US").map(shape),
+    pt: list.filter((e) => e.lang === "pt-BR").map(shape),
+    raw: list,
+  };
+}
+function nbDownloadExport() {
+  const blob = new Blob([JSON.stringify(nbExportLuLingo(), null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `gesr-notebook-${todayStamp()}.json`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 2000);
+}
+function nbImportFile(file) {
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const data = JSON.parse(reader.result);
+      const incoming = Array.isArray(data) ? data : (data.raw || []);
+      if (!incoming.length) { showBanner("الملف مفيهوش كلمات", "error"); return; }
+      let added = 0;
+      for (const e of incoming) {
+        if (!e || !e.w) continue;
+        if (nbAdd(e).added) added++;
+      }
+      showBanner(`اتضاف ${added} كلمة جديدة`, "info");
+      renderNotebook();
+    } catch (err) { showBanner("الملف مش سليم", "error"); }
+  };
+  reader.readAsText(file);
+}
+
+/* ================================================ استقبال المشاركة من التطبيقات */
+
+const SHARE_CACHE = "gesr-share";
+const LEARN_LANG_KEY = "gesr_learn_lang"; // اللغة اللي بيتعلمها — بتتستعمل للمشاركة
+
+function getLearnLang() { return localStorage.getItem(LEARN_LANG_KEY) || "pt-BR"; }
+function setLearnLang(v) { localStorage.setItem(LEARN_LANG_KEY, v); }
+
+async function handleSharedPayload() {
+  const params = new URLSearchParams(location.search);
+  const isShare = params.has("shared") || params.has("text") || params.has("title");
+  if (!isShare) return;
+
+  // ننضف الرابط عشان لو عمل refresh ما يعيدش نفس الحاجة
+  history.replaceState(null, "", location.pathname);
+
+  let text = (params.get("text") || params.get("title") || "").trim();
+  let file = null;
+
+  try {
+    const cache = await caches.open(SHARE_CACHE);
+    const tRes = await cache.match("/__share_text");
+    if (tRes) { const t = (await tRes.text()).trim(); if (t) text = t; await cache.delete("/__share_text"); }
+    const fRes = await cache.match("/__share_file");
+    if (fRes) {
+      const blob = await fRes.blob();
+      if (blob && blob.size) file = new File([blob], "shared." + (blob.type.split("/")[1] || "png"), { type: blob.type });
+      await cache.delete("/__share_file");
+    }
+  } catch (e) { /* المتصفح مش داعم — نكمل بالنص */ }
+
+  const learn = getLearnLang();
+
+  if (file) {
+    // اسكرين شوت من تطبيق تاني: نقرا بلغة التعلّم ونترجم للعربي
+    fromSelect.value = learn;
+    toSelect.value = "ar-EG";
+    fromLang = learn; toLang = "ar-EG";
+    refreshLabels();
+    showBanner("وصلتني صورة — بقراها...", "info");
+    await processImageFile(file);
+    renderPronFor();
+    offerCaptureFromLastText();
+    return;
+  }
+
+  if (text) {
+    const looksLatin = /[A-Za-zÀ-ÿ]/.test(text) && !/[؀-ۿ]/.test(text);
+    if (looksLatin) {
+      fromSelect.value = learn; toSelect.value = "ar-EG";
+      fromLang = learn; toLang = "ar-EG";
+    } else {
+      fromSelect.value = "ar-EG"; toSelect.value = learn;
+      fromLang = "ar-EG"; toLang = learn;
+    }
+    refreshLabels();
+    sourceText.value = text;
+    updateCharCount();
+    await runTranslate("from", false);
+    renderPronFor();
+    offerCaptureFromLastText();
+  }
+}
+
+// بعد ما يترجم نص مشارَك: نعرض زرار «احفظ الكلمات دي»
+function offerCaptureFromLastText() {
+  const target = pronSideAndLang();
+  if (!target) return;
+  const btn = document.getElementById("captureAllBtn");
+  if (btn) btn.style.display = "";
+}
+
+async function captureAllWords() {
+  const target = pronSideAndLang();
+  if (!target) return;
+  const btn = document.getElementById("captureAllBtn");
+  const words = [...new Set(target.text.split(WORD_SPLIT_RE).map(normalizeWord).filter((w) => w && w.length > 1))];
+  const fresh = words.filter((w) => !nbHas(w, target.lang));
+  if (!fresh.length) { showBanner("كل الكلمات دي في الدفتر بالفعل", "info"); return; }
+  if (btn) { btn.disabled = true; btn.textContent = `بيحفظ 0/${fresh.length}...`; }
+  await loadPronDict(target.lang);
+
+  let n = 0;
+  const sentence = target.text.trim().slice(0, 140);
+  for (const w of fresh) {
+    const hit = lookupWord(w, target.lang) || {};
+    // المعنى: من القاموس لو موجود، والباقي نسيبه للمراجعة (مش هنعمل طلب لكل كلمة)
+    nbAdd({ w, lang: target.lang, pron: hit.pron || "", ipa: hit.ipa || "", mean: hit.meaning || "", ctx: sentence });
+    n++;
+    if (btn) btn.textContent = `بيحفظ ${n}/${fresh.length}...`;
+  }
+  // الكلمات اللي مالهاش معنى: ترجمة واحدة مجمّعة
+  await fillMissingMeanings(target.lang);
+  if (btn) { btn.disabled = false; btn.textContent = "＋ احفظ كل الكلمات"; }
+  showBanner(`اتحفظ ${n} كلمة في الدفتر 📓`, "info");
+  renderPronFor();
+}
+
+// بيترجم الكلمات اللي لسه من غير معنى دفعة واحدة (سطر لكل كلمة)
+async function fillMissingMeanings(lang) {
+  const list = nbLoad();
+  const missing = list.filter((e) => e.lang === lang && !e.mean).slice(0, 40);
+  if (!missing.length) return;
+  try {
+    const joined = missing.map((e) => e.w).join("\n");
+    const out = await translateText(joined, lang, "ar-EG");
+    const lines = String(out).split("\n").map((s) => s.trim());
+    if (lines.length === missing.length) {
+      missing.forEach((e, i) => { e.mean = lines[i] || ""; });
+      nbSave(list);
+    }
+  } catch (e) { /* مش مشكلة — يفضلوا من غير معنى */ }
+}
+
+/* ====================================================== ربط الأزرار والواجهة */
+
+(function wireV3() {
+  const $$ = (id) => document.getElementById(id);
+
+  // زرار الدفتر
+  $$("notebookBtn").addEventListener("click", () => {
+    renderNotebook();
+    $$("notebookBackdrop").classList.add("open");
+  });
+  $$("notebookClose").addEventListener("click", () => $$("notebookBackdrop").classList.remove("open"));
+  $$("nbExportBtn").addEventListener("click", nbDownloadExport);
+  $$("nbImportBtn").addEventListener("click", () => $$("nbImportInput").click());
+  $$("nbImportInput").addEventListener("change", (e) => {
+    if (e.target.files && e.target.files[0]) nbImportFile(e.target.files[0]);
+    e.target.value = "";
+  });
+  $$("nbReviewBtn").addEventListener("click", startReview);
+  $$("nbSearchInput").addEventListener("input", (e) => { nbSearch = e.target.value; renderNotebook(); });
+  document.querySelectorAll("[data-nbfilter]").forEach((b) => {
+    b.addEventListener("click", () => {
+      document.querySelectorAll("[data-nbfilter]").forEach((x) => x.classList.remove("active"));
+      b.classList.add("active");
+      nbFilter = b.dataset.nbfilter;
+      renderNotebook();
+    });
+  });
+
+  // المراجعة
+  $$("reviewClose").addEventListener("click", () => $$("reviewBackdrop").classList.remove("open"));
+  $$("rvShowBtn").addEventListener("click", () => {
+    $$("rvPron").classList.remove("rv-hidden");
+    $$("rvBack").classList.remove("rv-hidden");
+    $$("rvShowBtn").style.display = "none";
+    $$("rvGradeRow").style.display = "flex";
+  });
+  $$("rvSayBtn").addEventListener("click", () => {
+    const c = nbQueueCurrent();
+    if (c) speakWord(c.w, c.lang);
+  });
+  $$("rvGoodBtn").addEventListener("click", () => {
+    const c = nbQueueCurrent();
+    if (c) nbGrade(c.id, true);
+    rvIndex++;
+    renderReviewCard();
+  });
+  $$("rvBadBtn").addEventListener("click", () => {
+    const c = nbQueueCurrent();
+    if (c) nbGrade(c.id, false);
+    rvIndex++;
+    renderReviewCard();
+  });
+
+  // النطق
+  $$("pronToggleBtn").addEventListener("click", () => {
+    pronOn = !pronOn;
+    localStorage.setItem(PRON_ON_KEY, pronOn ? "1" : "0");
+    $$("pronToggleBtn").textContent = pronOn ? "🔤 النطق: شغال" : "🔤 النطق: مقفول";
+    renderPronFor();
+  });
+  $$("pronToggleBtn").textContent = pronOn ? "🔤 النطق: شغال" : "🔤 النطق: مقفول";
+  $$("pronSayBtn").addEventListener("click", () => {
+    const t = pronSideAndLang();
+    if (t) speakWord(t.text, t.lang);
+  });
+  $$("captureAllBtn").addEventListener("click", captureAllWords);
+
+  // تفاصيل الكلمة
+  $$("wordDetailClose").addEventListener("click", () => $$("wordDetailBackdrop").classList.remove("open"));
+  $$("wdSayBtn").addEventListener("click", () => { if (wdCurrent) speakWord(wdCurrent.word, wdCurrent.lang); });
+  $$("wdSaveBtn").addEventListener("click", async () => {
+    if (!wdCurrent) return;
+    const btn = $$("wdSaveBtn");
+    btn.disabled = true;
+    btn.textContent = "بيحفظ...";
+    const hit = lookupWord(wdCurrent.word, wdCurrent.lang) || {};
+    nbAdd({
+      w: wdCurrent.word,
+      lang: wdCurrent.lang,
+      pron: hit.pron || "",
+      ipa: hit.ipa || "",
+      mean: hit.meaning || wdCurrent.fetchedMean || "",
+      ctx: (wdCurrent.ctx || "").slice(0, 140),
+    });
+    btn.textContent = "✓ في الدفتر";
+    renderPronFor();
+  });
+
+  // لغة التعلّم (بتتحدد بيها المشاركة من التطبيقات التانية)
+  const sel = $$("learnLangSelect");
+  if (sel) {
+    sel.value = getLearnLang();
+    sel.addEventListener("change", () => setLearnLang(sel.value));
+  }
+
+  // قفل النوافذ بالضغط على الخلفية
+  ["notebookBackdrop", "reviewBackdrop", "wordDetailBackdrop"].forEach((id) => {
+    const el = $$(id);
+    if (el) el.addEventListener("click", (e) => { if (e.target === el) el.classList.remove("open"); });
+  });
+
+  // النطق بيتحدّث مع أي تغيير في الصناديق
+  sourceText.addEventListener("input", () => { clearTimeout(window._pronT); window._pronT = setTimeout(renderPronFor, 700); });
+  outputText.addEventListener("input", () => { clearTimeout(window._pronT); window._pronT = setTimeout(renderPronFor, 700); });
+  fromSelect.addEventListener("change", () => setTimeout(renderPronFor, 100));
+  toSelect.addEventListener("change", () => setTimeout(renderPronFor, 100));
+  swapBtn.addEventListener("click", () => setTimeout(renderPronFor, 100));
+
+  // شارة «للمراجعة» على زرار الدفتر — عامة عشان nbSave تقدر تندهها بعد أي حفظ
+  window.refreshDueBadge = function () {
+    const n = nbDue().length;
+    $$("notebookBtn").textContent = n ? `📓 الدفتر (${n})` : "📓 الدفتر";
+  };
+  window.refreshDueBadge();
+  setInterval(window.refreshDueBadge, 30000);
+
+  // نبدأ تحميل قاموس لغة التعلّم بدري
+  loadPronDict(getLearnLang());
+  renderPronFor();
+  handleSharedPayload();
+
+  // اختصارات أيقونة التطبيق (ضغطة مطوّلة على الأيقونة)
+  const openParam = new URLSearchParams(location.search).get("open");
+  if (openParam === "notebook" || openParam === "review") {
+    history.replaceState(null, "", location.pathname);
+    if (openParam === "notebook") { renderNotebook(); $$("notebookBackdrop").classList.add("open"); }
+    else startReview();
+  }
+})();
 </script>
 </body>
 </html>
